@@ -431,7 +431,9 @@ export default function Bookings() {
       return filteredBookings.length;
     }
     if (status === 'cancelled') {
-      return mockBookings.filter(b => b.status === 'cancelled').length + expiredBookings.length;
+      // Return the count of actual cancelled bookings plus the expired ones
+      const actualCancelled = mockBookings.filter(b => b.status === 'cancelled').length;
+      return actualCancelled + expiredBookings.length;
     }
     return mockBookings.filter(b => b.status === status).length
   }
