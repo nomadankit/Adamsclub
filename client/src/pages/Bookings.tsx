@@ -394,7 +394,11 @@ export default function Bookings() {
   }
 
   const filteredBookings = mockBookings
-    .filter(b => b.status === activeTab)
+    .filter(b => {
+      if (activeTab === 'upcoming') return b.status === 'pending';
+      if (activeTab === 'active') return b.status === 'active';
+      return b.status === activeTab;
+    })
     .filter(b => filterType === 'all' || b.type === filterType)
     .filter(b => searchQuery === '' ||
       b.benefitTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -402,7 +406,11 @@ export default function Bookings() {
     )
 
   const getBookingCount = (status: BookingStatus) => {
-    return mockBookings.filter(b => b.status === status).length
+    return mockBookings.filter(b => {
+      if (status === 'upcoming') return b.status === 'pending';
+      if (status === 'active') return b.status === 'active';
+      return b.status === status;
+    }).length
   }
 
   const formatDate = (dateStr: string) => {
