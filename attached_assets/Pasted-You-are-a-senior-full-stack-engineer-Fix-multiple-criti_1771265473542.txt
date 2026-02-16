@@ -1,0 +1,240 @@
+You are a senior full-stack engineer. Fix multiple critical bugs in my Adam’s Club booking system and ensure it stays compatible with the Staff Panel + QR workflow.
+
+Problems to Fix (must reproduce and confirm)
+1) Booking tabs not working properly
+
+On My Bookings page (/bookings):
+
+Tabs: Upcoming / Active / Completed / Cancelled (and any “Pending” if present) are not filtering correctly.
+
+Old bookings remain visible in Upcoming.
+
+The count badges do not reflect real state.
+
+2) Wrong item booked (Bike button booked a Kayak)
+
+When I used the booking flow to book a bike, it created a booking for a kayak instead.
+This indicates a mismatch between UI selection and backend booking payload mapping (equipmentId/type/slug).
+
+3) Previous bookings still showing incorrectly
+
+Bookings that should be completed/cancelled are still shown under upcoming (and/or show incorrect status).
+
+4) Must remain compatible with Staff Panel workflow
+
+We already implemented/are implementing this staff workflow:
+
+Member creates booking → QR Pass generated
+
+Staff scans QR → sees booking → Start/Cancel
+
+After adventure → Return/Collect Gear
+
+Booking statuses change and inventory status changes
+
+Dashboard metrics should reflect data
+
+These fixes MUST NOT break staff panel scan/start/return or dashboard metrics.
+
+Requirements (hard constraints)
+A) Single source of truth for booking state
+
+Backend booking statuses must be canonical and consistent:
+
+PENDING (or UPCOMING) — scheduled, not started
+
+ACTIVE — checked out / started
+
+COMPLETED — returned
+
+CANCELLED — cancelled
+
+Front-end tabs must map to these statuses reliably.
+
+B) Correct gear selection and booking creation
+
+Booking must use a stable identifier:
+
+equipmentId (preferred) OR assetId if you book specific assets
+Do NOT book by display name string alone.
+
+C) Fix filtering + sorting
+
+My Bookings should:
+
+Upcoming: future or today bookings that are not started/cancelled (PENDING/UPCOMING)
+
+Active: ACTIVE
+
+Completed: COMPLETED
+
+Cancelled: CANCELLED
+Additionally:
+
+default sorting: soonest first for Upcoming, most recent first for Completed/Canceled
+
+D) End-to-end must match staff workflow
+
+Staff scanning must resolve booking reliably (via qrToken/bookingCode).
+
+Start/Return transitions must enforce state machine:
+
+PENDING → ACTIVE (Start)
+
+PENDING → CANCELLED (Cancel)
+
+ACTIVE → COMPLETED (Return)
+
+Dashboard metrics must match these statuses.
+
+Tasks (do in this exact order)
+1) Inspect current booking UI implementation
+
+Find My Bookings page component (likely client/src/pages/Bookings.tsx or similar).
+Identify:
+
+where tab state is stored
+
+how bookings list is fetched
+
+how filtering is done (client-side vs server-side)
+
+how counts are computed
+
+whether status mapping is wrong (e.g., “Upcoming” computed by date only, ignoring status)
+
+2) Inspect booking creation payload mapping (critical: bike→kayak)
+
+Find the “New Booking” flow component(s).
+Trace:
+
+what user selected (bike)
+
+what payload is sent to backend (equipmentId/type/slug/name)
+
+what backend uses to resolve equipment
+Find the exact mismatch causing bike selection to become kayak booking.
+
+Common causes to check:
+
+UI dropdown label is “bike” but value is “kayak”
+
+wrong index mapping (array order mismatch)
+
+using type string that defaults to kayak
+
+using stale state from previous selection
+
+backend fallback logic defaults to kayak when equipment lookup fails
+Fix it so the chosen equipmentId is always sent and validated.
+
+3) Normalize and enforce booking statuses in backend
+
+Find Booking schema/model and ensure:
+
+status field exists and uses canonical values
+
+booking creation sets correct initial status (PENDING/UPCOMING)
+
+staff start/return/cancel routes update status correctly
+
+schedule endpoint and dashboard metrics read the same statuses
+
+If you currently have mixed fields like state, phase, isActive, completedAt, etc., unify them (or implement a compatibility mapping layer).
+
+4) Fix server API to support correct filtering
+
+Implement or fix:
+
+GET /api/bookings?status=UPCOMING|ACTIVE|COMPLETED|CANCELLED (member)
+
+OR return all bookings with correct statuses and let client filter consistently.
+
+Also fix date logic:
+
+Upcoming should be determined by both status and start time (timezone-safe).
+
+Ensure “today” boundary uses configured timezone (not server UTC) to avoid misclassification.
+
+5) Fix client tabs + counts + stale items
+
+Update My Bookings page so:
+
+Tabs filter based on canonical status
+
+Counts reflect filtered totals
+
+Old bookings cannot appear in Upcoming unless they truly are upcoming
+
+If status is missing, derive it safely:
+
+If cancelledAt exists → CANCELLED
+
+Else if returnedAt/completedAt exists → COMPLETED
+
+Else if checkedOutAt exists → ACTIVE
+
+Else → UPCOMING
+But priority is to store status correctly in backend so derivation is rare.
+
+Also fix search + type filter to operate on the already correctly filtered list.
+
+6) Make sure Staff Panel + QR workflow stays aligned
+
+Confirm:
+
+QR token ties to bookingId/qrToken (not an asset barcode unless mapped)
+
+staff scan endpoint resolves booking correctly
+
+staff actions update booking.status and inventory statuses atomically
+
+dashboard metrics are computed from these canonical statuses
+
+7) Add guardrails + tests
+
+Add minimal regression checks:
+
+Creating a bike booking must create bike booking (equipmentId matches)
+
+Creating a kayak booking must create kayak booking
+
+Tabs show correct distribution after status changes (start/return/cancel)
+
+No default-to-kayak fallback allowed: if equipment lookup fails, return 400 with message.
+
+Deliverables
+
+Explain root causes:
+
+why bike booked as kayak
+
+why tabs mis-filter (status mapping? timezone? stale list? server filter bug?)
+
+why old bookings show in Upcoming
+
+List all files changed.
+
+Provide verification steps:
+
+Create bike booking → appears in Upcoming with “Bike”
+
+Start booking via staff scan → moves to Active tab
+
+Return booking → moves to Completed tab
+
+Cancel booking → moves to Cancelled tab
+
+Dashboard counts match the data
+
+Implementation Notes (must follow)
+
+Use stable IDs (equipmentId / bookingId).
+
+Do not silently default equipment type; fail fast with clear errors.
+
+Ensure member and staff endpoints use the same booking status values.
+
+Ensure UI uses API responses instead of hardcoded or stale cached state; invalidate queries after mutations.
+
+Start by tracing the bike booking creation flow end-to-end (UI selected gear → payload → backend resolution → stored booking record), then fix status normalization and tabs.
