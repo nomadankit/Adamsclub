@@ -74,7 +74,24 @@ export default function Bookings() {
           const res = await fetch(`/api/availability?${params}`);
           if (res.ok) {
             const data = await res.json();
-            setAvailabilitySlots(data);
+            // Filter out past time slots if the selected date is today
+            const now = new Date();
+            const selectedDate = new Date(bookingDetails.date);
+            const isToday = selectedDate.toDateString() === now.toDateString();
+
+            if (isToday) {
+              const currentHour = now.getHours();
+              const currentMinute = now.getMinutes();
+              const filteredData = data.filter((slot: any) => {
+                const [hour, minute] = slot.time.split(':').map(Number);
+                if (hour > currentHour) return true;
+                if (hour === currentHour && minute > currentMinute) return true;
+                return false;
+              });
+              setAvailabilitySlots(filteredData);
+            } else {
+              setAvailabilitySlots(data);
+            }
           }
         } catch (e) {
           console.error("Failed to fetch availability", e);
