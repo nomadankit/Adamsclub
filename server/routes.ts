@@ -434,7 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).where(eq(bookings.id, id));
         
         await tx.update(assets).set({ 
-          status: AssetStatus.CHECKED_OUT,
+          status: 'active',
           isAvailable: false
         }).where(eq(assets.id, booking.assetId));
       });
@@ -547,7 +547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(assets, eq(bookings.assetId, assets.id))
         .where(
           and(
-            eq(bookings.status, BookingStatus.CHECKED_OUT),
+            eq(bookings.status, BookingStatus.ACTIVE),
             eq(assets.type, 'gear')
           )
         );
@@ -663,7 +663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).where(eq(bookings.id, id));
         
         await tx.update(assets).set({ 
-          status: AssetStatus.CHECKED_OUT,
+          status: 'active',
           isAvailable: false
         }).where(eq(assets.id, booking.assetId));
       });
@@ -712,7 +712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.PENDING && booking.status !== 'confirmed') {
+      if (booking.status !== BookingStatus.PENDING) {
         return res.status(409).json({ message: "Can only cancel pending bookings" });
       }
 
@@ -1169,7 +1169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).where(eq(bookings.id, id));
         
         await tx.update(assets).set({ 
-          status: AssetStatus.CHECKED_OUT,
+          status: 'active',
           isAvailable: false
         }).where(eq(assets.id, booking.assetId));
       });
@@ -1218,7 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.PENDING && booking.status !== 'confirmed') {
+      if (booking.status !== BookingStatus.PENDING) {
         return res.status(409).json({ message: "Can only cancel pending bookings" });
       }
 
@@ -1418,8 +1418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(bookings.userId, memberId),
             or(
-              eq(bookings.status, BookingStatus.CONFIRMED),
-              eq(bookings.status, BookingStatus.CHECKED_OUT),
+              eq(bookings.status, BookingStatus.ACTIVE),
               eq(bookings.status, BookingStatus.PENDING)
             )
           )
@@ -2013,9 +2012,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const formattedBookings = userBookings.map(({ booking, asset }) => {
         // Determine status based on booking status
         let frontendStatus = 'upcoming';
-        if (booking.status === BookingStatus.CHECKED_OUT) {
+        if (booking.status === BookingStatus.ACTIVE) {
           frontendStatus = 'active';
-        } else if (booking.status === BookingStatus.CHECKED_IN || booking.status === 'completed') {
+        } else if (booking.status === 'completed') {
           frontendStatus = 'completed';
         } else if (booking.status === BookingStatus.CANCELLED) {
           frontendStatus = 'cancelled';
@@ -2347,7 +2346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[STAFF_DASHBOARD] Inventory: total=${totalItems}, available=${availableItems}, maintenance=${maintenanceItems}`);
 
       // Get pending returns (checked_out bookings) scoped to same assets
-      const pendingConditions = [eq(bookings.status, BookingStatus.CHECKED_OUT)];
+      const pendingConditions = [eq(bookings.status, BookingStatus.ACTIVE)];
       if (assetFilter) pendingConditions.unshift(assetFilter);
 
       const pendingCheckIns = await db
@@ -2411,9 +2410,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lte(bookings.startDate, lastDay),
             or(
               eq(bookings.status, 'pending'),
-              eq(bookings.status, 'confirmed'),
-              eq(bookings.status, 'checked_out'),
-              eq(bookings.status, 'checked_in')
+              eq(bookings.status, 'active'),
+              eq(bookings.status, 'completed')
             )
           )
         )
@@ -2530,7 +2528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db
         .update(bookings)
         .set({
-          status: BookingStatus.CHECKED_OUT,
+          status: BookingStatus.ACTIVE,
           checkedOutAt: new Date(),
           checkedOutBy: req.user.id,
           updatedAt: new Date(),
@@ -2588,7 +2586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pendingCheckIns = await db
         .select()
         .from(bookings)
-        .where(eq(bookings.status, 'checked_out'));
+        .where(eq(bookings.status, 'active'));
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -2744,10 +2742,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         and(
           inArray(bookings.assetId, assetIds),
           or(
-            eq(bookings.status, 'confirmed'),
-            eq(bookings.status, 'checked_out'),
-            eq(bookings.status, 'checked_in'),
-            eq(bookings.status, 'pending')
+            eq(bookings.status, 'pending'),
+            eq(bookings.status, 'active'),
+            eq(bookings.status, 'completed')
           ),
           // Overlap with day
           lt(bookings.startDate, endOfDay),
@@ -3027,7 +3024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sql`${bookings.status} != 'cancelled'`,
             // overlaps today or is currently checked out (active)
             or(
-              eq(bookings.status, 'checked_out'),
+              eq(bookings.status, 'active'),
               and(gte(bookings.startDate, startOfDay), lte(bookings.startDate, endOfDay))
             )
           )
@@ -3043,7 +3040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Determine current status
         // 1. Checked Out?
-        const active = assetBookings.find(b => b.booking.status === 'checked_out');
+        const active = assetBookings.find(b => b.booking.status === 'active');
         // 2. In Buffer? (Completed but in buffer window)
         // We need to check completed bookings too? The query above fetches checked_out or overlapping today.
         // If a booking ended 30 mins ago, it's in buffer.
@@ -3084,7 +3081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             contact: currentBooking.user?.phone,
             startTime: currentBooking.booking.startDate,
             endTime: currentBooking.booking.endDate,
-            isOverdue: currentBooking.booking.status === 'checked_out' && new Date() > currentBooking.booking.endDate
+            isOverdue: currentBooking.booking.status === 'active' && new Date() > currentBooking.booking.endDate
           } : null,
           nextBooking: next ? {
             startTime: next.booking.startDate

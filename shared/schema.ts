@@ -134,7 +134,7 @@ export const tierPerks = sqliteTable("tier_perks", {
 // Asset status enum for scan actions
 export const AssetStatus = {
   AVAILABLE: 'available',
-  CHECKED_OUT: 'checked_out',
+  CHECKED_OUT: 'active',
   MAINTENANCE: 'maintenance',
   OUT_OF_SERVICE: 'out_of_service'
 } as const;

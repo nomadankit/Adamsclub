@@ -207,7 +207,7 @@ export default function MemberScan() {
                           </p>
                         </div>
                         <Badge variant="secondary" className="ml-2">
-                          {booking.status === 'checked_out' ? (
+                          {booking.status === 'active' ? (
                             <div className="flex items-center gap-1">
                               <CheckCircle2 className="h-3 w-3" />
                               Active

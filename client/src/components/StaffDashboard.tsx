@@ -151,7 +151,7 @@ export default function StaffDashboard() {
                             </p>
                           </div>
                           <div className="ml-auto font-medium">
-                            <Badge variant={booking.status === 'checked_out' ? 'secondary' : 'outline'}>
+                            <Badge variant={booking.status === 'active' ? 'secondary' : 'outline'}>
                               {booking.status}
                             </Badge>
                           </div>

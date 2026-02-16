@@ -46,8 +46,8 @@ export default function StaffArrivals() {
   }
 
   const bookings = dashboard?.bookings || []
-  const pending = bookings.filter(b => b.status !== 'checked_out')
-  const checkedOut = bookings.filter(b => b.status === 'checked_out')
+  const pending = bookings.filter(b => b.status === 'pending')
+  const checkedOut = bookings.filter(b => b.status === 'active')
 
   return (
     <div className="min-h-screen bg-background">

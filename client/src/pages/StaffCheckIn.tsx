@@ -129,7 +129,7 @@ export default function StaffCheckIn() {
 
   const handleCheckin = () => {
     if (!selectedBooking) return
-    if (selectedBooking.status === 'checked_out') {
+    if (selectedBooking.status === 'active') {
       setShowDamageForm(true)
     }
   }
@@ -193,8 +193,8 @@ export default function StaffCheckIn() {
     )
   }
 
-  const pendingCheckouts = dashboard?.bookings.filter(b => b.status !== 'checked_out') || []
-  const checkedOutItems = dashboard?.bookings.filter(b => b.status === 'checked_out') || []
+  const pendingCheckouts = dashboard?.bookings.filter(b => b.status === 'pending') || []
+  const checkedOutItems = dashboard?.bookings.filter(b => b.status === 'active') || []
 
   return (
     <div className="min-h-screen bg-background">
@@ -321,10 +321,10 @@ export default function StaffCheckIn() {
                   <div className="flex items-center justify-between">
                     <CardTitle>{selectedBooking.assetName}</CardTitle>
                     <Badge
-                      variant={selectedBooking.status === 'checked_out' ? 'secondary' : 'outline'}
+                      variant={selectedBooking.status === 'active' ? 'secondary' : 'outline'}
                       data-testid={`badge-status-${selectedBooking.id}`}
                     >
-                      {selectedBooking.status === 'checked_out' ? 'Checked Out' : 'Pending Checkout'}
+                      {selectedBooking.status === 'active' ? 'Active' : 'Pending Checkout'}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -346,7 +346,7 @@ export default function StaffCheckIn() {
                   </div>
 
                   {/* Check-in with Condition Form */}
-                  {showDamageForm && selectedBooking.status === 'checked_out' && (
+                  {showDamageForm && selectedBooking.status === 'active' && (
                     <div className="space-y-4 p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
                       <div className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
                         <AlertCircle className="h-4 w-4" />
@@ -376,7 +376,7 @@ export default function StaffCheckIn() {
 
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-4">
-                    {selectedBooking.status !== 'checked_out' ? (
+                    {selectedBooking.status !== 'active' ? (
                       <>
                         <Button
                           onClick={handleCheckout}
