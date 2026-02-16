@@ -1,0 +1,85 @@
+You are a senior full-stack engineer. Debug and fix a blocking bug in my “Adam’s Club” app: users cannot book adventure gear.
+
+What’s happening
+
+On the /bookings page, booking fails and the UI shows “Booking failed…”.
+
+Vite overlay shows:
+
+[plugin:runtime-error-plugin] Configuration Error: No "kayak" equipment found in system. Please contact admin.
+
+Error originates from: client/src/pages/Bookings.tsx:220:15 where we do:
+
+const errorData = await response.json()
+
+throw new Error(errorData.message || 'Failed to create booking')
+
+So the backend API is returning a 4xx/5xx with message saying it can’t find kayak equipment.
+
+Your task
+
+Trace the booking request from UI → API route → database query:
+
+Find the endpoint the Bookings page calls (likely /api/bookings or similar).
+
+Identify how it determines the equipment item ("kayak").
+
+Fix the root cause so booking works reliably:
+
+Ensure the system can resolve equipment by a stable identifier (prefer equipmentId over name).
+
+If booking uses a slug/name (like "kayak"), make lookup robust:
+
+case-insensitive match
+
+trimmed input
+
+consistent slug normalization
+
+Ensure equipment exists
+
+Check if equipment is stored in DB and whether seeding/initialization is missing.
+
+If required, implement a seed/init step that inserts default equipment (including kayak) on first run/dev.
+
+If equipment should be admin-created, update UI to only allow selecting equipment that actually exists in DB.
+
+Improve error handling
+
+Return consistent JSON errors from the server: { message, code, details }
+
+On client, display the message returned by server without crashing; keep overlay from blocking normal operation during dev.
+
+Add safeguards + tests
+
+Add a small unit/integration test (or a minimal script) to verify:
+
+equipment lookup works for “kayak”, “Kayak”, “ kayak ”
+
+booking creation succeeds when equipment exists
+
+booking returns a helpful error when equipment is missing
+
+Deliverables
+
+A clear explanation: why “kayak” wasn’t found (seed missing? mismatch between slug and DB record? wrong environment DB?).
+
+Code changes that:
+
+make equipment lookup deterministic and robust
+
+make booking creation succeed
+
+prevent this regression
+
+Point me to the exact files changed and what to run to verify.
+
+Start by:
+
+Finding the booking API handler and the equipment lookup function/query.
+
+Logging the payload being sent from Bookings.tsx and the server’s received payload.
+
+Checking the equipment table/collection contents and how “kayak” should be represented.
+
+Do not stop at band-aids. Fix the underlying data + identifier mismatch so booking works for all gear types.
