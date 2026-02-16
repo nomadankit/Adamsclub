@@ -258,8 +258,8 @@ export function registerStripeRoutes(app: Express) {
           },
         ],
         mode: "subscription",
-        success_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/payment-success?canceled=true`,
+        success_url: `${req.protocol}://${req.get('host')}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get('host')}/payment-success?canceled=true`,
         client_reference_id: req.user.id,
         customer_email: req.user.email,
         metadata: {
@@ -587,8 +587,8 @@ export function registerStripeRoutes(app: Express) {
             },
           ],
           mode: "subscription",
-          success_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/payment-success?canceled=true`,
+          success_url: `${req.protocol}://${req.get('host')}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${req.protocol}://${req.get('host')}/payment-success?canceled=true`,
           client_reference_id: userId,
           metadata: {
             userId: userId,
@@ -713,8 +713,8 @@ export function registerStripeRoutes(app: Express) {
             },
           ],
           mode: "payment",
-          success_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/payment-success?canceled=true`,
+          success_url: `${req.protocol}://${req.get('host')}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${req.protocol}://${req.get('host')}/payment-success?canceled=true`,
           client_reference_id: userId,
           metadata: {
             userId: userId,
