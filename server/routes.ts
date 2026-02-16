@@ -1423,8 +1423,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse duration (e.g., "Full day", "2 hours") - defaulting to numeric hours for now or handling strings
       let hours = 1;
       if (typeof duration === 'string') {
-        if (duration.includes('day')) hours = 8;
-        else if (duration.includes('hour')) hours = parseFloat(duration) || 1;
+        if (duration.toLowerCase().includes('day')) hours = 8;
+        else if (duration.toLowerCase().includes('hour')) hours = parseFloat(duration) || 1;
         else hours = 1;
       } else if (typeof duration === 'number') {
         hours = duration;
@@ -1433,18 +1433,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endDate = new Date(startDate.getTime() + hours * 60 * 60 * 1000);
 
       // 1. Determine Asset
-      let targetAssetId = assetId;
+      let targetAssetId = assetId || benefitId;
 
       if (!targetAssetId) {
         // Find an available asset of the requested type/benefit
         // Map benefitId/type to asset type
-        let assetType = type || 'gear'; // default to gear
+        const assetType = (type || 'gear').toLowerCase().trim();
         
-        // Fix: map 'camping' to 'camping' if it comes from the frontend
-        if (assetType.toLowerCase() === 'camping') {
-          assetType = 'camping';
-        }
-
         console.log(`[BOOKING] Looking for available asset of type: ${assetType} for range ${startDate} to ${endDate}`);
 
         const availableAsset = await storage.findAvailableAsset(assetType, startDate, endDate);
@@ -1454,10 +1449,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const allAssetsOfType = await storage.getAssets({ type: assetType });
           if (allAssetsOfType.length === 0) {
             console.error(`[BOOKING] CRITICAL: No assets of type "${assetType}" exist in the database!`);
-            return res.status(409).json({ message: `Configuration Error: No "${assetType}" equipment found in system. Please contact admin.` });
+            return res.status(404).json({ 
+              message: `Configuration Error: No "${assetType}" equipment found in system. Please contact admin.`,
+              code: 'EQUIPMENT_NOT_FOUND',
+              details: { assetType }
+            });
           }
           
-          return res.status(409).json({ message: "No assets available for the selected time slot (including buffer periods)." });
+          return res.status(409).json({ 
+            message: "No assets available for the selected time slot (including buffer periods).",
+            code: 'NO_AVAILABILITY'
+          });
         }
         targetAssetId = availableAsset.id;
       }
