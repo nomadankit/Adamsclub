@@ -49,14 +49,12 @@ export default function StaffSchedule() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'checked_out':
+      case 'active':
         return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
-      case 'checked_in':
+      case 'completed':
         return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
       case 'pending':
         return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
-      case 'confirmed':
-        return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
       default:
         return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
     }
@@ -64,14 +62,12 @@ export default function StaffSchedule() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'checked_out':
+      case 'active':
         return 'Out'
-      case 'checked_in':
+      case 'completed':
         return 'Returned'
       case 'pending':
         return 'Pending'
-      case 'confirmed':
-        return 'Confirmed'
       default:
         return status
     }
@@ -100,8 +96,8 @@ export default function StaffSchedule() {
 
   const totalStats = {
     total: dates.reduce((sum, date) => sum + (bookingsByDate[date]?.length || 0), 0),
-    checkedOut: dates.reduce((sum, date) => sum + (bookingsByDate[date]?.filter(b => b.status === 'checked_out').length || 0), 0),
-    checkedIn: dates.reduce((sum, date) => sum + (bookingsByDate[date]?.filter(b => b.status === 'checked_in').length || 0), 0),
+    checkedOut: dates.reduce((sum, date) => sum + (bookingsByDate[date]?.filter(b => b.status === 'active').length || 0), 0),
+    checkedIn: dates.reduce((sum, date) => sum + (bookingsByDate[date]?.filter(b => b.status === 'completed').length || 0), 0),
     pending: dates.reduce((sum, date) => sum + (bookingsByDate[date]?.filter(b => b.status === 'pending').length || 0), 0),
   }
 

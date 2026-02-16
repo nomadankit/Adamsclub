@@ -916,6 +916,14 @@ export async function handleSuccessfulPayment(session: Stripe.Checkout.Session) 
         updatedAt: new Date(),
       });
 
+      // Update booking status if this was a booking payment
+      if (metadata.bookingId) {
+        await db.update(bookings)
+          .set({ status: 'pending' })
+          .where(eq(bookings.id, metadata.bookingId));
+        console.log(`✅ Updated booking ${metadata.bookingId} to pending status`);
+      }
+
       // Update user's plan limit and reset usage
       const user = await storage.getUser(userId);
       if (user) {
