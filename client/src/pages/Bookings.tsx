@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import QRCodeGenerator from 'qrcode'
 
-type BookingStatus = 'upcoming' | 'active' | 'completed' | 'cancelled'
+type BookingStatus = 'pending' | 'active' | 'completed' | 'cancelled'
 type BookingType = 'kayak' | 'camping' | 'bike' | 'hiking'
 
 interface Booking {
@@ -43,7 +43,7 @@ export default function Bookings() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [showQRModal, setShowQRModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<BookingStatus>('upcoming')
+  const [activeTab, setActiveTab] = useState<BookingStatus>('pending')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<BookingType | 'all'>('all')
   const [bookingStep, setBookingStep] = useState<'select' | 'details' | 'confirm'>('select')
