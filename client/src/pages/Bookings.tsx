@@ -597,8 +597,8 @@ export default function Bookings() {
 
       {/* Booking Benefits Modal */}
       <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
-        <DialogContent className="max-w-md mx-auto max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-md mx-auto max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-none px-6 pt-6">
             <DialogTitle className="flex items-center space-x-2">
               <Mountain className="h-5 w-5 text-primary" />
               <span>Book Your Adventure</span>
@@ -610,266 +610,265 @@ export default function Bookings() {
             </DialogDescription>
           </DialogHeader>
 
-          {bookingStep === 'select' && (
-            <div className="space-y-3 mt-4">
-              {membershipBenefits.map((benefit) => (
-                <Card
-                  key={benefit.id}
-                  className={`cursor-pointer transition-all duration-200 hover:shadow-md ${benefit.remaining > 0
-                    ? 'border-green-200 dark:border-green-800 bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-950/20'
-                    : 'opacity-50 border-gray-200 dark:border-gray-800'
-                    } ${benefit.popular ? 'ring-2 ring-primary/20' : ''}`}
-                  onClick={() => handleSelectBenefit(benefit)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center space-x-3">
-                        <div className="text-2xl">{benefit.icon}</div>
-                        <div>
-                          <h3 className="font-semibold text-sm flex items-center space-x-2">
-                            <span>{benefit.title}</span>
-                            {benefit.popular && (
-                              <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
-                                Popular
-                              </Badge>
-                            )}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">{benefit.description}</p>
+          <div className="flex-1 overflow-y-auto px-6 py-2 min-h-0">
+            {bookingStep === 'select' && (
+              <div className="space-y-3">
+                {membershipBenefits.map((benefit) => (
+                  <Card
+                    key={benefit.id}
+                    className={`cursor-pointer transition-all duration-200 hover:shadow-md ${benefit.remaining > 0
+                      ? 'border-green-200 dark:border-green-800 bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-950/20'
+                      : 'opacity-50 border-gray-200 dark:border-gray-800'
+                      } ${benefit.popular ? 'ring-2 ring-primary/20' : ''}`}
+                    onClick={() => handleSelectBenefit(benefit)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <div className="text-2xl">{benefit.icon}</div>
+                          <div>
+                            <h3 className="font-semibold text-sm flex items-center space-x-2">
+                              <span>{benefit.title}</span>
+                              {benefit.popular && (
+                                <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+                                  Popular
+                                </Badge>
+                              )}
+                            </h3>
+                            <p className="text-xs text-muted-foreground">{benefit.description}</p>
+                          </div>
+                        </div>
+                        {benefit.remaining > 0 && (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>{benefit.duration}</span>
+                        </div>
+                        <div className="text-xs text-right">
+                          <span className="font-bold text-primary block mb-1">
+                            {benefit.creditCost} Credits
+                          </span>
+                          <span className={`font-semibold ${benefit.remaining > 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                            {benefit.remaining} of {benefit.total} remaining
+                          </span>
                         </div>
                       </div>
-                      {benefit.remaining > 0 && (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
+
+                      {benefit.remaining === 0 && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          All monthly allowances used. Resets next month.
+                        </div>
                       )}
-                    </div>
+                    </CardContent>
+                  </Card>
+                ))}
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{benefit.duration}</span>
-                      </div>
-                      <div className="text-xs text-right">
-                        <span className="font-bold text-primary block mb-1">
-                          {benefit.creditCost} Credits
-                        </span>
-                        <span className={`font-semibold ${benefit.remaining > 0 ? 'text-green-600' : 'text-gray-500'}`}>
-                          {benefit.remaining} of {benefit.total} remaining
-                        </span>
-                      </div>
-                    </div>
-
-                    {benefit.remaining === 0 && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        All monthly allowances used. Resets next month.
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-
-              <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Need more adventures? Upgrade your membership or purchase à la carte.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setLocation('/upgrade')}
-                  >
-                    Upgrade Plan
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {bookingStep === 'details' && selectedBenefit && (
-            <div className="py-4 space-y-4">
-              <Card className="p-4">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="text-2xl">{selectedBenefit.icon}</div>
-                  <div>
-                    <h3 className="font-semibold">{selectedBenefit.title}</h3>
-                    <p className="text-sm text-muted-foreground">{selectedBenefit.description}</p>
+                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 pb-4">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Need more adventures? Upgrade your membership or purchase à la carte.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setLocation('/upgrade')}
+                    >
+                      Upgrade Plan
+                    </Button>
                   </div>
                 </div>
-              </Card>
-
-              <div className="space-y-4">
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium">Date</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !bookingDetails.date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {bookingDetails.date ? format(new Date(bookingDetails.date), "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={bookingDetails.date ? new Date(bookingDetails.date) : undefined}
-                        onSelect={(date) => {
-                          setBookingDetails(prev => ({
-                            ...prev,
-                            date: date ? format(date, "yyyy-MM-dd") : '',
-                            time: '',
-                            duration: '' // Reset time/duration on date change
-                          }));
-                          // Trigger availability fetch here or via useEffect
-                        }}
-                        disabled={(date) =>
-                          date < new Date(new Date().setHours(0, 0, 0, 0))
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Start Time Dropdown */}
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium">Start Time</label>
-                  <Select
-                    value={bookingDetails.time}
-                    onValueChange={(value) => setBookingDetails(prev => ({ ...prev, time: value, duration: '' }))}
-                    disabled={!bookingDetails.date}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={bookingDetails.date ? "Select start time" : "Pick a date first"} />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      {availabilitySlots.map((slot) => (
-                        <SelectItem
-                          key={slot.time}
-                          value={slot.time}
-                          disabled={slot.status === 'booked'}
-                          className={slot.status === 'booked' ? 'opacity-50' : ''}
-                          title={slot.status === 'booked' ? (slot.note || 'Reserved') : ''}
-                        >
-                          {formatTime(slot.time)} {slot.status === 'booked' ? (slot.note ? `(${slot.note})` : '(Reserved)') : ''}
-                        </SelectItem>
-                      ))}
-                      {availabilitySlots.length === 0 && bookingDetails.date && (
-                        <div className="p-2 text-sm text-gray-500 text-center">Loading or no slots...</div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* End Time Dropdown */}
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium">End Time</label>
-                  <Select
-                    value={bookingDetails.duration}
-                    onValueChange={(value) => setBookingDetails(prev => ({ ...prev, duration: value }))}
-                    disabled={!bookingDetails.time}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={bookingDetails.time ? "Select end time" : "Select start time first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getEndTimeOptions().map((opt) => (
-                        <SelectItem
-                          key={opt.value}
-                          value={opt.value}
-                          disabled={opt.disabled}
-                          className={opt.disabled ? 'opacity-50' : ''}
-                        >
-                          {opt.label} {opt.disabled ? '(Unavailable)' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium">Location</label>
-                  <Select
-                    value={bookingDetails.location}
-                    onValueChange={(value) => setBookingDetails(prev => ({ ...prev, location: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Lake Marina Dock A">Lake Marina Dock A</SelectItem>
-                      <SelectItem value="Equipment Center">Equipment Center</SelectItem>
-                      <SelectItem value="Trailhead Station">Trailhead Station</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
+            )}
 
-              <div className="flex space-x-2 pt-4">
-                <Button variant="outline" className="flex-1" onClick={() => setBookingStep('select')}>
-                  Back
-                </Button>
-                <Button
-                  className="flex-1 enhanced-button variant-primary"
-                  onClick={handleProceedToConfirm}
-                  disabled={!bookingDetails.date || !bookingDetails.time || !bookingDetails.duration || !bookingDetails.location}
-                >
-                  Continue
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {bookingStep === 'confirm' && selectedBenefit && (
-            <div className="py-4 space-y-4">
-              <Card className="p-4">
-                <h3 className="font-semibold mb-3">Booking Summary</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-lg">{selectedBenefit.icon}</div>
+            {bookingStep === 'details' && selectedBenefit && (
+              <div className="space-y-4 pb-4">
+                <Card className="p-4">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="text-2xl">{selectedBenefit.icon}</div>
                     <div>
-                      <p className="font-medium">{selectedBenefit.title}</p>
+                      <h3 className="font-semibold">{selectedBenefit.title}</h3>
                       <p className="text-sm text-muted-foreground">{selectedBenefit.description}</p>
                     </div>
                   </div>
-                  <div className="border-t pt-3 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Date:</span>
-                      <span className="font-medium">{formatDate(bookingDetails.date)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Time:</span>
-                      <span className="font-medium">{bookingDetails.time}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Location:</span>
-                      <span className="font-medium">{bookingDetails.location}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Duration:</span>
-                      <span className="font-medium">{selectedBenefit.duration}</span>
-                    </div>
+                </Card>
+
+                <div className="space-y-4">
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium">Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !bookingDetails.date && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {bookingDetails.date ? format(new Date(bookingDetails.date), "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={bookingDetails.date ? new Date(bookingDetails.date) : undefined}
+                          onSelect={(date) => {
+                            setBookingDetails(prev => ({
+                              ...prev,
+                              date: date ? format(date, "yyyy-MM-dd") : '',
+                              time: '',
+                              duration: '' // Reset time/duration on date change
+                            }));
+                          }}
+                          disabled={(date) =>
+                            date < new Date(new Date().setHours(0, 0, 0, 0))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium">Start Time</label>
+                    <Select
+                      value={bookingDetails.time}
+                      onValueChange={(value) => setBookingDetails(prev => ({ ...prev, time: value, duration: '' }))}
+                      disabled={!bookingDetails.date}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={bookingDetails.date ? "Select start time" : "Pick a date first"} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {availabilitySlots.map((slot) => (
+                          <SelectItem
+                            key={slot.time}
+                            value={slot.time}
+                            disabled={slot.status === 'booked'}
+                            className={slot.status === 'booked' ? 'opacity-50' : ''}
+                            title={slot.status === 'booked' ? (slot.note || 'Reserved') : ''}
+                          >
+                            {formatTime(slot.time)} {slot.status === 'booked' ? (slot.note ? `(${slot.note})` : '(Reserved)') : ''}
+                          </SelectItem>
+                        ))}
+                        {availabilitySlots.length === 0 && bookingDetails.date && (
+                          <div className="p-2 text-sm text-gray-500 text-center">Loading or no slots...</div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium">End Time</label>
+                    <Select
+                      value={bookingDetails.duration}
+                      onValueChange={(value) => setBookingDetails(prev => ({ ...prev, duration: value }))}
+                      disabled={!bookingDetails.time}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={bookingDetails.time ? "Select end time" : "Select start time first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getEndTimeOptions().map((opt) => (
+                          <SelectItem
+                            key={opt.value}
+                            value={opt.value}
+                            disabled={opt.disabled}
+                            className={opt.disabled ? 'opacity-50' : ''}
+                          >
+                            {opt.label} {opt.disabled ? '(Unavailable)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium">Location</label>
+                    <Select
+                      value={bookingDetails.location}
+                      onValueChange={(value) => setBookingDetails(prev => ({ ...prev, location: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Lake Marina Dock A">Lake Marina Dock A</SelectItem>
+                        <SelectItem value="Equipment Center">Equipment Center</SelectItem>
+                        <SelectItem value="Trailhead Station">Trailhead Station</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              </Card>
 
-              <div className="flex space-x-2">
-                <Button variant="outline" className="flex-1" onClick={() => setBookingStep('details')} disabled={bookingInProgress}>
-                  Back
-                </Button>
-                <Button
-                  className="flex-1 enhanced-button variant-primary"
-                  onClick={handleConfirmBooking}
-                  disabled={bookingInProgress}
-                >
-                  {bookingInProgress ? 'Booking...' : 'Confirm Booking'}
-                </Button>
+                <div className="flex space-x-2 pt-4">
+                  <Button variant="outline" className="flex-1" onClick={() => setBookingStep('select')}>
+                    Back
+                  </Button>
+                  <Button
+                    className="flex-1 enhanced-button variant-primary"
+                    onClick={handleProceedToConfirm}
+                    disabled={!bookingDetails.date || !bookingDetails.time || !bookingDetails.duration || !bookingDetails.location}
+                  >
+                    Continue
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {bookingStep === 'confirm' && selectedBenefit && (
+              <div className="space-y-4 pb-4">
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3">Booking Summary</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="text-lg">{selectedBenefit.icon}</div>
+                      <div>
+                        <p className="font-medium">{selectedBenefit.title}</p>
+                        <p className="text-sm text-muted-foreground">{selectedBenefit.description}</p>
+                      </div>
+                    </div>
+                    <div className="border-t pt-3 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Date:</span>
+                        <span className="font-medium">{formatDate(bookingDetails.date)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Time:</span>
+                        <span className="font-medium">{bookingDetails.time}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Location:</span>
+                        <span className="font-medium">{bookingDetails.location}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Duration:</span>
+                        <span className="font-medium">{selectedBenefit.duration}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <div className="flex space-x-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setBookingStep('details')} disabled={bookingInProgress}>
+                    Back
+                  </Button>
+                  <Button
+                    className="flex-1 enhanced-button variant-primary"
+                    onClick={handleConfirmBooking}
+                    disabled={bookingInProgress}
+                  >
+                    {bookingInProgress ? 'Booking...' : 'Confirm Booking'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
