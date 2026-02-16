@@ -53,7 +53,7 @@ export default function AuthCallback() {
         await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
         
         // Successful login - redirect to home
-        window.location.href = '/';
+        window.location.href = '/home';
       } catch (err) {
         console.error('Callback error:', err);
         setLocation('/auth');
