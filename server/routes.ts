@@ -1636,17 +1636,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create the booking with PostgreSQL schema
       // Create the booking
       // Note: We avoid .returning() here as it can cause issues with some SQLite drivers
-      await db.insert(bookings).values({
-        id: bookingId,
-        userId: user.id,
-        assetId: benefitId,
-        status: BookingStatus.CONFIRMED,
-        startDate: startDateTime,
-        endDate: startDateTime, // For now, same as start
-        qrCode,
-        creditsUsed: cost.toFixed(2),
-        paidWithCredits: cost > 0,
-      });
+      // FIX: Ensure assetId exists in assets table to avoid foreign key failure
+      const asset = await storage.getAsset(benefitId);
+      if (!asset) {
+        // Fallback: try to find any asset of the given type if benefitId is not a valid UUID
+        const assetType = (type || 'gear').toLowerCase().trim();
+        const availableAsset = await storage.findAvailableAsset(assetType, startDateTime, startDateTime);
+        if (availableAsset) {
+          await db.insert(bookings).values({
+            id: bookingId,
+            userId: user.id,
+            assetId: availableAsset.id,
+            status: BookingStatus.CONFIRMED,
+            startDate: startDateTime,
+            endDate: startDateTime, // For now, same as start
+            qrCode,
+            creditsUsed: cost.toFixed(2),
+            paidWithCredits: cost > 0,
+          });
+        } else {
+          throw new Error(`No available asset of type ${assetType} found for booking.`);
+        }
+      } else {
+        await db.insert(bookings).values({
+          id: bookingId,
+          userId: user.id,
+          assetId: benefitId,
+          status: BookingStatus.CONFIRMED,
+          startDate: startDateTime,
+          endDate: startDateTime, // For now, same as start
+          qrCode,
+          creditsUsed: cost.toFixed(2),
+          paidWithCredits: cost > 0,
+        });
+      }
 
       // We already have all the data we need, so we can construct the response
       // without querying the DB again or relying on .returning()

@@ -674,7 +674,7 @@ export class DatabaseStorage implements IStorage {
         }
 
         // Check user has sufficient credits
-        const [user] = await tx.select().from(users).where(eq(users.id, bookingData.userId));
+        const [user] = tx.select().from(users).where(eq(users.id, bookingData.userId)).all();
         if (!user) throw new Error('User not found');
 
         const currentBalance = parseFloat(user.adamsCredits || '0.00');
@@ -684,21 +684,23 @@ export class DatabaseStorage implements IStorage {
 
         // Spend the credits
         const newBalance = currentBalance - creditAmount;
-        await tx
+        tx
           .update(users)
           .set({
             adamsCredits: newBalance.toFixed(2),
             updatedAt: new Date()
           })
-          .where(eq(users.id, bookingData.userId));
+          .where(eq(users.id, bookingData.userId))
+          .run();
 
         actualCreditsUsed = creditAmount;
         paidWithCredits = creditAmount >= (bookingData.totalAmount || 0);
 
         // Record credit transaction
-        await tx
+        tx
           .insert(creditTransactions)
           .values({
+            id: crypto.randomUUID(),
             userId: bookingData.userId,
             type: CreditTransactionType.SPEND,
             amount: (-creditAmount).toFixed(2),
@@ -706,23 +708,29 @@ export class DatabaseStorage implements IStorage {
             description: `Payment for booking`,
             relatedEntityType: 'booking',
             relatedEntityId: '', // Will be updated after booking creation
-          });
+            createdAt: new Date()
+          })
+          .run();
       }
 
       // Create booking with credit information
-      const [booking] = await tx
+      const bookingId = crypto.randomUUID();
+      tx
         .insert(bookings)
         .values({
           ...bookingData,
+          id: bookingId,
           creditsUsed: actualCreditsUsed.toFixed(2),
           paidWithCredits,
           qrCode: `AC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         })
-        .returning();
+        .run();
+
+      const [booking] = tx.select().from(bookings).where(eq(bookings.id, bookingId)).all();
 
       // Update credit transaction with booking ID
       if (actualCreditsUsed > 0) {
-        await tx
+        tx
           .update(creditTransactions)
           .set({ relatedEntityId: booking.id })
           .where(
@@ -731,7 +739,8 @@ export class DatabaseStorage implements IStorage {
               eq(creditTransactions.relatedEntityType, 'booking'),
               eq(creditTransactions.relatedEntityId, '')
             )
-          );
+          )
+          .run();
       }
 
       return booking;
