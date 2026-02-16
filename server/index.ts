@@ -2,12 +2,18 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import passport from "passport";
 import { registerRoutes } from "./routes";
-// Force restart
 import { registerStripeRoutes } from "./stripeRoutes";
 import { setupVite, serveStatic, log } from "./vite";
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[PROCESS] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[PROCESS] Uncaught Exception:', error);
+});
+
 const app = express();
-// Skip JSON parsing for webhook to verify Stripe signature
 app.use((req, res, next) => {
   if (req.path === '/api/webhook') {
     next();
@@ -58,10 +64,14 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error('[GLOBAL_ERROR]', err);
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    const code = err.code || 'INTERNAL_ERROR';
 
-    res.status(status).json({ message });
+    if (!res.headersSent) {
+      res.status(status).json({ message, code, details: err.details || null });
+    }
   });
 
   // importantly only setup vite in development and after

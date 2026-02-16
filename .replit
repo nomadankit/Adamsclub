@@ -29,10 +29,6 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application (Single)"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -41,18 +37,6 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Start application (Single)"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev -- --host 0.0.0.0 --port 5000"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [agent]
 integrations = ["javascript_log_in_with_replit:1.0.0", "javascript_sendgrid:1.0.0", "javascript_stripe:1.0.0", "javascript_database:1.0.0", "javascript_openai_ai_integrations:1.0.0"]

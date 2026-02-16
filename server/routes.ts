@@ -1409,98 +1409,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a new booking
+  // Create a new booking (atomic: validates equipment, then creates booking + deducts credits in one transaction)
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const { assetId, benefitId, type, date, time, duration, location, notes, creditCost } = req.body;
+      const { assetId, benefitId, benefitTitle, benefitIcon, type, date, time, duration, location, notes, creditCost } = req.body;
 
-      if (!date || !time || !duration) {
-        return res.status(400).json({ message: "Date, time, and duration are required" });
+      console.log(`[BOOKING] Request payload:`, JSON.stringify({ assetId, benefitId, type, date, time, duration, location, creditCost }));
+
+      if (!date || !time) {
+        return res.status(400).json({ message: "Date and time are required", code: 'VALIDATION_ERROR' });
       }
 
-      // Calculate start and end times
-      const startDate = new Date(`${date}T${time}`);
-      // Parse duration (e.g., "Full day", "2 hours") - defaulting to numeric hours for now or handling strings
+      const startDate = new Date(`${date}T${time}${time.length <= 5 ? ':00' : ''}`);
+      if (isNaN(startDate.getTime())) {
+        return res.status(400).json({ message: "Invalid date or time format", code: 'VALIDATION_ERROR' });
+      }
+
       let hours = 1;
       if (typeof duration === 'string') {
         if (duration.toLowerCase().includes('day')) hours = 8;
         else if (duration.toLowerCase().includes('hour')) hours = parseFloat(duration) || 1;
-        else hours = 1;
+        else {
+          const parsed = parseFloat(duration);
+          if (!isNaN(parsed)) hours = parsed;
+        }
       } else if (typeof duration === 'number') {
         hours = duration;
       }
-
       const endDate = new Date(startDate.getTime() + hours * 60 * 60 * 1000);
 
-      // 1. Determine Asset
-      let targetAssetId = assetId || benefitId;
+      // 1. Resolve the actual asset from the database
+      let targetAsset = null;
 
-      if (!targetAssetId) {
-        // Find an available asset of the requested type/benefit
-        // Map benefitId/type to asset type
+      if (assetId) {
+        targetAsset = await storage.getAsset(assetId);
+      }
+
+      if (!targetAsset && benefitId) {
+        targetAsset = await storage.getAsset(benefitId);
+      }
+
+      if (!targetAsset) {
         const assetType = (type || 'gear').toLowerCase().trim();
-        
-        console.log(`[BOOKING] Looking for available asset of type: ${assetType} for range ${startDate} to ${endDate}`);
+        console.log(`[BOOKING] No direct asset match for benefitId="${benefitId}". Searching by type="${assetType}"`);
 
         const availableAsset = await storage.findAvailableAsset(assetType, startDate, endDate);
-        if (!availableAsset) {
-          // EMERGENCY FALLBACK: If no asset is found but we are in a demo/dev environment,
-          // check if we can just pick ANY asset of that type if there are no assets at all.
+        if (availableAsset) {
+          targetAsset = availableAsset;
+        } else {
           const allAssetsOfType = await storage.getAssets({ type: assetType });
+
           if (allAssetsOfType.length === 0) {
-            console.error(`[BOOKING] CRITICAL: No assets of type "${assetType}" exist in the database!`);
-            return res.status(404).json({ 
-              message: `Configuration Error: No "${assetType}" equipment found in system. Please contact admin.`,
-              code: 'EQUIPMENT_NOT_FOUND',
-              details: { assetType }
+            const allGearAssets = await storage.getAssets({ type: 'gear' });
+            if (allGearAssets.length > 0) {
+              const available = await storage.findAvailableAsset('gear', startDate, endDate);
+              if (available) {
+                targetAsset = available;
+                console.log(`[BOOKING] Fallback: using gear asset "${available.name}" (id: ${available.id})`);
+              }
+            }
+
+            if (!targetAsset) {
+              console.error(`[BOOKING] No assets of type "${assetType}" or "gear" exist in the database`);
+              return res.status(404).json({
+                message: `No "${assetType}" equipment found in the system. Please contact admin.`,
+                code: 'EQUIPMENT_NOT_FOUND',
+                details: { assetType }
+              });
+            }
+          } else {
+            return res.status(409).json({
+              message: "No assets available for the selected time slot (including buffer periods).",
+              code: 'NO_AVAILABILITY'
             });
           }
-          
-          return res.status(409).json({ 
-            message: "No assets available for the selected time slot (including buffer periods).",
-            code: 'NO_AVAILABILITY'
-          });
         }
-        targetAssetId = availableAsset.id;
       }
 
-      // 2. Double check conflicts for the specific asset
-      const hasConflict = await storage.checkBookingConflicts(targetAssetId, startDate, endDate);
+      console.log(`[BOOKING] Resolved asset: "${targetAsset.name}" (id: ${targetAsset.id})`);
+
+      // 2. Check booking conflicts
+      const hasConflict = await storage.checkBookingConflicts(targetAsset.id, startDate, endDate);
       if (hasConflict) {
-        return res.status(409).json({ message: "Selected time slot overlaps with an existing reservation or buffer period." });
-      }
-
-      // 3. Create Booking
-      // Handle credits payment if needed
-      let booking;
-
-      // If payment required (creditCost > 0)
-      if (creditCost > 0) {
-        booking = await storage.createBookingWithCredits({
-          userId: req.user.id,
-          assetId: targetAssetId,
-          status: BookingStatus.CONFIRMED,
-          startDate,
-          endDate,
-          totalAmount: 0, // Paid with credits
-          notes
-        }, creditCost);
-      } else {
-        booking = await storage.createBooking({
-          userId: req.user.id,
-          assetId: targetAssetId,
-          status: BookingStatus.CONFIRMED,
-          startDate,
-          endDate,
-          totalAmount: 0,
-          notes
+        return res.status(409).json({
+          message: "Selected time slot overlaps with an existing reservation or buffer period.",
+          code: 'TIME_CONFLICT'
         });
       }
 
-      res.status(201).json(booking);
+      // 3. Validate credit balance BEFORE transaction (fast fail)
+      const cost = Number(creditCost) || 0;
+      if (cost > 0) {
+        const currentUser = await storage.getUser(req.user.id);
+        const currentCredits = parseFloat(currentUser?.adamsCredits || '0');
+        console.log(`[BOOKING] Credit check - balance: ${currentCredits}, cost: ${cost}`);
+        if (currentCredits < cost) {
+          return res.status(400).json({
+            message: `Insufficient adventure credits. Available: ${currentCredits.toFixed(2)}, Required: ${cost.toFixed(2)}`,
+            code: 'INSUFFICIENT_CREDITS'
+          });
+        }
+      }
+
+      // 4. ATOMIC: Create booking + deduct credits in a single transaction
+      const booking = await storage.createBookingWithCredits({
+        userId: req.user.id,
+        assetId: targetAsset.id,
+        status: BookingStatus.CONFIRMED,
+        startDate,
+        endDate,
+        totalAmount: 0,
+        notes: notes || null
+      }, cost > 0 ? cost : undefined);
+
+      console.log(`[BOOKING] Success - booking id: ${booking.id}, credits used: ${booking.creditsUsed}`);
+
+      const formattedBooking = {
+        id: booking.id,
+        benefitId: targetAsset.id,
+        benefitTitle: benefitTitle || targetAsset.name,
+        benefitIcon: benefitIcon || 'Package',
+        date: date,
+        time: time,
+        location: location || targetAsset.location || 'TBD',
+        status: 'upcoming',
+        type: type || targetAsset.type || 'gear',
+        duration: duration || 'Full day',
+        qrCode: booking.qrCode,
+      };
+
+      res.status(201).json(formattedBooking);
     } catch (error: any) {
-      console.error("Error creating booking:", error);
-      res.status(500).json({ message: error.message || "Failed to create booking" });
+      console.error("[BOOKING] Error creating booking:", error);
+      if (!res.headersSent) {
+        const statusCode = error.message?.includes('Insufficient') ? 400 : 500;
+        res.status(statusCode).json({
+          message: error.message || "Failed to create booking",
+          code: 'BOOKING_ERROR'
+        });
+      }
     }
   });
 
@@ -1585,140 +1632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a new booking
-  app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
-    try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const { benefitId, benefitTitle, benefitIcon, date, time, location, type, duration, creditCost } = req.body;
-
-      // Validate required fields
-      if (!benefitId || !date || !time) {
-        return res.status(400).json({ message: "Missing required fields" });
-      }
-
-      // Check credit balance if cost > 0
-      const cost = Number(creditCost) || 0;
-      if (cost > 0) {
-        // Get fresh user data to ensure up-to-date balance
-        const currentUser = await storage.getUser(user.id);
-        const currentCredits = Number(currentUser.adamsCredits || 0);
-
-        if (currentCredits < cost) {
-          return res.status(400).json({ message: "Insufficient adventure credits. Please top up your account." });
-        }
-
-        // Deduct credits
-        await storage.spendCredits(
-          user.id,
-          cost,
-          `Booking: ${benefitTitle || 'Adventure'}`,
-          undefined,
-          undefined
-        );
-      }
-
-      // Generate unique booking ID and QR code
-      const bookingId = `booking_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-      const qrCode = `QR-${bookingId.substring(0, 20).toUpperCase()}`;
-
-      // Parse date and time correctly (time should be in 24-hour format like "14:00")
-      const startDateTime = new Date(`${date}T${time}:00`);
-
-      // Validate the date
-      if (isNaN(startDateTime.getTime())) {
-        return res.status(400).json({ message: "Invalid date or time format" });
-      }
-
-      // Create the booking with PostgreSQL schema
-      // Create the booking
-      // Note: We avoid .returning() here as it can cause issues with some SQLite drivers
-      // FIX: Ensure assetId exists in assets table to avoid foreign key failure
-      const asset = await storage.getAsset(benefitId);
-      if (!asset) {
-        // Fallback: try to find any asset of the given type if benefitId is not a valid UUID
-        const assetType = (type || 'gear').toLowerCase().trim();
-        const availableAsset = await storage.findAvailableAsset(assetType, startDateTime, startDateTime);
-        if (availableAsset) {
-          await db.insert(bookings).values({
-            id: bookingId,
-            userId: user.id,
-            assetId: availableAsset.id,
-            status: BookingStatus.CONFIRMED,
-            startDate: startDateTime,
-            endDate: startDateTime, // For now, same as start
-            qrCode,
-            creditsUsed: cost.toFixed(2),
-            paidWithCredits: cost > 0,
-          });
-        } else {
-          throw new Error(`No available asset of type ${assetType} found for booking.`);
-        }
-      } else {
-        await db.insert(bookings).values({
-          id: bookingId,
-          userId: user.id,
-          assetId: benefitId,
-          status: BookingStatus.CONFIRMED,
-          startDate: startDateTime,
-          endDate: startDateTime, // For now, same as start
-          qrCode,
-          creditsUsed: cost.toFixed(2),
-          paidWithCredits: cost > 0,
-        });
-      }
-
-      // We already have all the data we need, so we can construct the response
-      // without querying the DB again or relying on .returning()
-      const newBooking = {
-        id: bookingId,
-        qrCode
-      };
-
-      // Return booking in the format expected by frontend
-      const formattedBooking = {
-        id: newBooking.id,
-        benefitId: benefitId,
-        benefitTitle: benefitTitle,
-        benefitIcon: benefitIcon,
-        date: date,
-        time: time,
-        location: location,
-        status: 'upcoming',
-        type: type,
-        duration: duration,
-        qrCode: newBooking.qrCode,
-      };
-
-      res.status(201).json(formattedBooking);
-    } catch (error) {
-      console.error("Error creating booking:", error);
-
-      try {
-        const fs = await import('fs');
-        const path = await import('path');
-        const logPath = path.join(process.cwd(), 'booking_debug_v2.log');
-        const errorLog = `
-Timestamp: ${new Date().toISOString()}
-Error: ${error}
-Stack: ${(error as any).stack}
-Request Body: ${JSON.stringify(req.body, null, 2)}
-User ID: ${req.user ? (req.user as any).id : 'unknown'}
-Assets Check: BenefitID=${req.body.benefitId}
-----------------------------------------
-`;
-        fs.appendFileSync(logPath, errorLog);
-        console.log(`Error logged to ${logPath}`);
-      } catch (logError) {
-        console.error("Failed to write to log file:", logError);
-      }
-
-      res.status(500).json({ message: "Failed to create booking (Server v2)" });
-    }
-  });
+  // (Duplicate POST /api/bookings removed - consolidated into single atomic handler above)
 
   // Get a specific booking by ID
   app.get("/api/bookings/:id", isAuthenticated, async (req: any, res) => {

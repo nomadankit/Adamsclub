@@ -216,13 +216,23 @@ export default function Bookings() {
         body: JSON.stringify(bookingData)
       })
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to create booking')
+        let errorMessage = 'Failed to create booking'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.message || errorMessage
+        } catch {
+          try {
+            errorMessage = await response.text() || errorMessage
+          } catch {
+          }
+        }
+        throw new Error(errorMessage)
       }
       return response.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] })
+      queryClient.invalidateQueries({ queryKey: ['credits'] })
       toast({
         title: "Booking confirmed!",
         description: "Your booking has been successfully created.",
@@ -232,10 +242,10 @@ export default function Bookings() {
       setSelectedBenefit(null)
       setBookingDetails({ date: '', time: '', location: '', duration: '1' })
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Booking failed",
-        description: "There was an error creating your booking. Please try again.",
+        description: error.message || "There was an error creating your booking. Please try again.",
         variant: "destructive"
       })
     }
@@ -249,8 +259,17 @@ export default function Bookings() {
         credentials: 'include'
       })
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to cancel booking')
+        let errorMessage = 'Failed to cancel booking'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.message || errorMessage
+        } catch {
+          try {
+            errorMessage = await response.text() || errorMessage
+          } catch {
+          }
+        }
+        throw new Error(errorMessage)
       }
       return response.json()
     },

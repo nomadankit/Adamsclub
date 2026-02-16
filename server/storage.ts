@@ -662,27 +662,24 @@ export class DatabaseStorage implements IStorage {
     bookingData: Omit<InsertBooking, 'creditsUsed' | 'paidWithCredits'>,
     creditAmount?: number
   ): Promise<Booking> {
-    return await db.transaction(async (tx) => {
+    return db.transaction((tx) => {
       let actualCreditsUsed = 0;
       let paidWithCredits = false;
 
-      // If credit payment is requested
       if (creditAmount && creditAmount > 0) {
-        // Validate credit amount
         if (creditAmount <= 0 || !Number.isFinite(creditAmount)) {
           throw new Error('Credit amount must be a positive number');
         }
 
-        // Check user has sufficient credits
         const [user] = tx.select().from(users).where(eq(users.id, bookingData.userId)).all();
         if (!user) throw new Error('User not found');
 
         const currentBalance = parseFloat(user.adamsCredits || '0.00');
+        console.log(`[BOOKING_TX] Credit balance before: ${currentBalance}, cost: ${creditAmount}`);
         if (currentBalance < creditAmount) {
           throw new Error(`Insufficient Adams Credits. Available: ${currentBalance.toFixed(2)}, Required: ${creditAmount.toFixed(2)}`);
         }
 
-        // Spend the credits
         const newBalance = currentBalance - creditAmount;
         tx
           .update(users)
@@ -696,25 +693,12 @@ export class DatabaseStorage implements IStorage {
         actualCreditsUsed = creditAmount;
         paidWithCredits = creditAmount >= (bookingData.totalAmount || 0);
 
-        // Record credit transaction
-        tx
-          .insert(creditTransactions)
-          .values({
-            id: crypto.randomUUID(),
-            userId: bookingData.userId,
-            type: CreditTransactionType.SPEND,
-            amount: (-creditAmount).toFixed(2),
-            balanceAfter: newBalance.toFixed(2),
-            description: `Payment for booking`,
-            relatedEntityType: 'booking',
-            relatedEntityId: '', // Will be updated after booking creation
-            createdAt: new Date()
-          })
-          .run();
+        console.log(`[BOOKING_TX] Credits deducted: ${creditAmount}, new balance: ${newBalance}`);
       }
 
-      // Create booking with credit information
       const bookingId = crypto.randomUUID();
+      console.log(`[BOOKING_TX] Creating booking ${bookingId} for asset ${bookingData.assetId}`);
+
       tx
         .insert(bookings)
         .values({
@@ -728,21 +712,26 @@ export class DatabaseStorage implements IStorage {
 
       const [booking] = tx.select().from(bookings).where(eq(bookings.id, bookingId)).all();
 
-      // Update credit transaction with booking ID
       if (actualCreditsUsed > 0) {
+        const [updatedUser] = tx.select().from(users).where(eq(users.id, bookingData.userId)).all();
+        const balanceAfter = updatedUser?.adamsCredits || '0.00';
         tx
-          .update(creditTransactions)
-          .set({ relatedEntityId: booking.id })
-          .where(
-            and(
-              eq(creditTransactions.userId, bookingData.userId),
-              eq(creditTransactions.relatedEntityType, 'booking'),
-              eq(creditTransactions.relatedEntityId, '')
-            )
-          )
+          .insert(creditTransactions)
+          .values({
+            id: crypto.randomUUID(),
+            userId: bookingData.userId,
+            type: CreditTransactionType.SPEND,
+            amount: (-creditAmount!).toFixed(2),
+            balanceAfter,
+            description: `Payment for booking ${bookingId}`,
+            relatedEntityType: 'booking',
+            relatedEntityId: bookingId,
+            createdAt: new Date()
+          })
           .run();
       }
 
+      console.log(`[BOOKING_TX] Transaction committed - booking ${bookingId} created`);
       return booking;
     });
   }
