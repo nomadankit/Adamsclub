@@ -419,10 +419,8 @@ export class DatabaseStorage implements IStorage {
       // Check for active/confirmed bookings only? usually pending also blocks
       or(
         eq(bookings.status, 'pending'),
-        eq(bookings.status, 'confirmed'),
-        eq(bookings.status, 'checked_in'),
-        eq(bookings.status, 'checked_out') // If it was checked out, it still consumed time? Usually yes.
-        // active/completed/cancelled logic might vary, but assuming non-cancelled blocks.
+        eq(bookings.status, 'active'),
+        eq(bookings.status, 'completed')
       ),
       // Overlap logic: (StartA < EndB) and (EndA > StartB)
       // Here Range A = New Booking [startDate, newBufferEnd]

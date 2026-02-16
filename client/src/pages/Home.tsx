@@ -144,7 +144,7 @@ export default function Home() {
 
   // Get upcoming bookings (next 3)
   const upcomingBookings = bookings
-    .filter((b: Booking) => b.status === 'upcoming' || b.status === 'active')
+    .filter((b: Booking) => b.status === 'pending' || b.status === 'active')
     .slice(0, 3)
 
   // Map icons based on asset type
