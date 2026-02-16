@@ -1467,7 +1467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (bookingId) {
         await db.update(bookings)
           .set({
-            status: BookingStatus.CHECKED_IN,
+            status: BookingStatus.COMPLETED,
             checkedInAt: new Date(),
             checkedInBy: req.user.id,
             updatedAt: new Date()
@@ -2496,7 +2496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db
         .update(bookings)
         .set({
-          status: BookingStatus.CHECKED_IN,
+          status: BookingStatus.COMPLETED,
           checkedInAt: new Date(),
           checkedInBy: req.user.id,
           damageNotes: damageNotes || null,
@@ -2596,7 +2596,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const todaysBookings = await db
         .select()
         .from(bookings)
-        .where(and(gte(bookings.startDate, today), lte(bookings.startDate, tomorrow)));
+        .where(and(
+          gte(bookings.startDate, today), 
+          lte(bookings.startDate, tomorrow),
+          inArray(bookings.status, [BookingStatus.PENDING, BookingStatus.ACTIVE])
+        ));
 
       const availableGear = enrichedInventory.filter(inv => inv.quantity > 0).length;
       const inMaintenance = allAssets.filter(a => a.maintenanceMode).length;

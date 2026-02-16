@@ -502,11 +502,11 @@ export default function Bookings() {
             ) : (
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as BookingStatus)}>
                 <TabsList className="grid w-full grid-cols-4 mb-6">
-                  <TabsTrigger value="upcoming" className="relative">
+                  <TabsTrigger value="pending" className="relative">
                     Upcoming
-                    {getBookingCount('upcoming') > 0 && (
+                    {getBookingCount('pending') > 0 && (
                       <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                        {getBookingCount('upcoming')}
+                        {getBookingCount('pending')}
                       </Badge>
                     )}
                   </TabsTrigger>
@@ -526,7 +526,7 @@ export default function Bookings() {
                   </TabsTrigger>
                 </TabsList>
 
-                {(['upcoming', 'active', 'completed', 'cancelled'] as BookingStatus[]).map(status => (
+                {(['pending', 'active', 'completed', 'cancelled'] as BookingStatus[]).map(status => (
                   <TabsContent key={status} value={status} className="space-y-4">
                     {filteredBookings.length === 0 ? (
                       <div className="text-center py-16">
@@ -534,7 +534,7 @@ export default function Bookings() {
                           <Package className="h-16 w-16 mx-auto mb-4 opacity-50" />
                           <p className="text-lg mb-2">No {status} bookings</p>
                           <p className="text-sm">
-                            {status === 'upcoming' && "Book your next adventure to get started"}
+                            {status === 'pending' && "Book your next adventure to get started"}
                             {status === 'active' && "No gear currently checked out"}
                             {status === 'completed' && "Your completed adventures will appear here"}
                             {status === 'cancelled' && "No cancelled bookings"}
@@ -600,7 +600,7 @@ export default function Bookings() {
                               </div>
                             )}
 
-                            {booking.status === 'upcoming' && booking.qrCode && (
+                            {booking.status === 'pending' && (booking as any).qrToken && (
                               <div className="mt-3 pt-3 border-t border-border">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-2">
