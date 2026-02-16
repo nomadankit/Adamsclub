@@ -73,12 +73,19 @@ Comprehensive admin management portal for Adam's Club (outdoor equipment rental 
 
 ## Recent Changes
 
-### Critical Booking Bug Fix (Feb 2026)
+### Booking System Bug Fixes (Feb 2026 - Latest)
+- **Bike→Kayak fix**: Equipment resolution no longer falls back to any available gear. New `findAvailableAssetByCategory()` searches by category keywords (name/category/description) to match the correct equipment type
+- **Status normalization**: `BookingStatus.CONFIRMED` (non-existent) replaced with `BookingStatus.PENDING`. All status references now use canonical values: PENDING/ACTIVE/COMPLETED/CANCELLED
+- **Tab filtering fix**: Frontend tabs now filter using canonical status values. Backend returns `'pending'` (not `'upcoming'`). Tabs correctly show Upcoming=pending, Active=active, Completed=completed, Cancelled=cancelled
+- **QR Token fix**: `createBookingWithCredits()` now generates `qrToken` and `bufferEnd`. `getBookingByQRToken()` searches both `qrToken` and `qrCode` columns for backward compatibility
+- **Startup normalization**: Server normalizes existing bookings with invalid statuses and missing qrTokens on startup
+- **Duplicate routes removed**: Staff scan/start/return/cancel routes were registered 3x; consolidated to single authoritative set
+- **Sorting**: Upcoming bookings sorted soonest-first; Completed/Cancelled sorted most-recent-first
+
+### Critical Booking Bug Fix (Feb 2026 - Previous)
 - **Server crash fix**: Added process-level `unhandledRejection`/`uncaughtException` handlers and enhanced global error middleware to always return JSON
-- **Atomic booking+credits**: Removed duplicate POST /api/bookings route (second handler deducted credits outside transaction). Consolidated into single handler using synchronous `db.transaction()` for better-sqlite3 atomicity
-- **Equipment lookup fix**: Client sends hardcoded benefitId (e.g. 'kayak-premium') - handler now resolves to actual DB asset by: direct ID lookup -> type search -> gear fallback -> 404 JSON
-- **Client error handling**: Safe JSON parsing in Bookings.tsx mutation (try/catch around response.json(), falls back to text)
-- Root cause: credits were deducted via `spendCredits()` BEFORE booking creation; if booking insert failed (FK constraint on non-existent assetId), credits were already gone with no rollback
+- **Atomic booking+credits**: Removed duplicate POST /api/bookings route. Consolidated into single handler using synchronous `db.transaction()` for better-sqlite3 atomicity
+- **Client error handling**: Safe JSON parsing in Bookings.tsx mutation
 
 ### Previous Changes (Turn 12)
 

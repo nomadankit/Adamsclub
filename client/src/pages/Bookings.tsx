@@ -32,6 +32,7 @@ interface Booking {
   type: BookingType
   duration: string
   qrCode?: string
+  qrToken?: string
   checkInTime?: string
   checkOutTime?: string
   notes?: string
@@ -377,13 +378,13 @@ export default function Bookings() {
   }
 
   const getStatusBadge = (status: BookingStatus) => {
-    const configs = {
-      upcoming: { label: 'Upcoming', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: Hourglass },
+    const configs: Record<string, { label: string; className: string; icon: any }> = {
+      pending: { label: 'Upcoming', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: Hourglass },
       active: { label: 'Active', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle },
       completed: { label: 'Completed', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200', icon: CheckCheck },
       cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: XCircle }
     }
-    const config = configs[status]
+    const config = configs[status] || configs.pending
     const Icon = config.icon
     return (
       <Badge className={`${config.className} flex items-center space-x-1`}>
@@ -394,25 +395,21 @@ export default function Bookings() {
   }
 
   const filteredBookings = mockBookings
-    .filter(b => {
-      if (activeTab === 'upcoming') return b.status === 'pending';
-      if (activeTab === 'active') return b.status === 'active';
-      if (activeTab === 'completed') return b.status === 'completed';
-      return b.status === activeTab;
-    })
+    .filter(b => b.status === activeTab)
     .filter(b => filterType === 'all' || b.type === filterType)
     .filter(b => searchQuery === '' ||
       b.benefitTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.location.toLowerCase().includes(searchQuery.toLowerCase())
     )
+    .sort((a, b) => {
+      if (activeTab === 'pending') {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      }
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    })
 
   const getBookingCount = (status: BookingStatus) => {
-    return mockBookings.filter(b => {
-      if (status === 'upcoming') return b.status === 'pending';
-      if (status === 'active') return b.status === 'active';
-      if (status === 'completed') return b.status === 'completed';
-      return b.status === status;
-    }).length
+    return mockBookings.filter(b => b.status === status).length
   }
 
   const formatDate = (dateStr: string) => {
@@ -1015,7 +1012,7 @@ export default function Bookings() {
               </div>
 
               <div className="pt-4 border-t space-y-2">
-                {(selectedBooking.status === 'upcoming' || selectedBooking.status === 'active') && selectedBooking.qrCode && (
+                {(selectedBooking.status === 'pending' || selectedBooking.status === 'active') && selectedBooking.qrCode && (
                   <Button
                     className="w-full enhanced-button variant-primary"
                     onClick={() => {
@@ -1028,7 +1025,7 @@ export default function Bookings() {
                   </Button>
                 )}
 
-                {selectedBooking.status === 'upcoming' && (
+                {selectedBooking.status === 'pending' && (
                   <Button
                     variant="outline"
                     className="w-full"

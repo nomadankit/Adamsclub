@@ -57,7 +57,45 @@ async function determineCategoryFromName(assetName: string): Promise<string> {
   }
 }
 
+async function normalizeBookingStatuses() {
+  try {
+    const validStatuses = [BookingStatus.PENDING, BookingStatus.ACTIVE, BookingStatus.COMPLETED, BookingStatus.CANCELLED];
+    const allBookings = await db.select().from(bookings);
+    let fixed = 0;
+
+    for (const booking of allBookings) {
+      if (!validStatuses.includes(booking.status as any)) {
+        let newStatus = BookingStatus.PENDING;
+        if (booking.checkedInAt) {
+          newStatus = BookingStatus.COMPLETED;
+        } else if (booking.checkedOutAt) {
+          newStatus = BookingStatus.ACTIVE;
+        }
+        await db.update(bookings).set({ status: newStatus }).where(eq(bookings.id, booking.id));
+        fixed++;
+      }
+
+      if (!booking.qrToken && booking.qrCode) {
+        await db.update(bookings).set({ qrToken: booking.qrCode }).where(eq(bookings.id, booking.id));
+        fixed++;
+      } else if (!booking.qrToken && !booking.qrCode) {
+        const token = `ACB-${crypto.randomUUID()}`;
+        await db.update(bookings).set({ qrToken: token, qrCode: token }).where(eq(bookings.id, booking.id));
+        fixed++;
+      }
+    }
+
+    if (fixed > 0) {
+      console.log(`[STARTUP] Normalized ${fixed} booking records`);
+    }
+  } catch (error) {
+    console.error("[STARTUP] Error normalizing bookings:", error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  await normalizeBookingStatuses();
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
@@ -475,6 +513,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to return gear" });
     }
   });
+
+  // Cancel Booking (staff)
+  app.post("/api/staff/bookings/:id/cancel", requireStaff, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const booking = await storage.getBooking(id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      if (booking.status !== BookingStatus.PENDING) {
+        return res.status(409).json({ message: "Can only cancel pending bookings" });
+      }
+
+      await storage.updateBookingStatus(id, BookingStatus.CANCELLED);
+      res.json({ ok: true, message: "Booking cancelled" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cancel booking" });
+    }
+  });
+
   app.get("/api/dashboard/metrics", requireAdmin, async (req: any, res) => {
     try {
       const now = new Date();
@@ -612,114 +669,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dashboard metrics:", error);
       res.status(500).json({ message: "Failed to fetch dashboard metrics" });
-    }
-  });
-
-  app.get("/api/staff/scan", requireStaff, async (req: any, res) => {
-    try {
-      const { code } = req.query;
-      if (!code) return res.status(400).json({ message: "No scan code provided" });
-
-      const booking = await storage.getBookingByQRToken(code);
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found", barcode: code });
-      }
-
-      const asset = await storage.getAsset(booking.assetId);
-      const member = await storage.getUser(booking.userId);
-
-      res.json({
-        ok: true,
-        booking,
-        asset,
-        member: member ? {
-          firstName: member.firstName,
-          lastName: member.lastName,
-          email: member.email
-        } : null
-      });
-    } catch (error) {
-      console.error("Scan error:", error);
-      res.status(500).json({ message: "Server error during scan" });
-    }
-  });
-
-  // Start Adventure
-  app.post("/api/staff/bookings/:id/start", requireStaff, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const booking = await storage.getBooking(id);
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-      if (booking.status !== BookingStatus.PENDING) {
-        return res.status(409).json({ message: `Cannot start adventure from state: ${booking.status}` });
-      }
-
-      await db.transaction(async (tx) => {
-        await tx.update(bookings).set({ 
-          status: BookingStatus.ACTIVE, 
-          checkedOutAt: new Date(),
-          checkedOutBy: req.user.id 
-        }).where(eq(bookings.id, id));
-        
-        await tx.update(assets).set({ 
-          status: 'active',
-          isAvailable: false
-        }).where(eq(assets.id, booking.assetId));
-      });
-
-      res.json({ ok: true, message: "Adventure started" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to start adventure" });
-    }
-  });
-
-  // Return Adventure
-  app.post("/api/staff/bookings/:id/return", requireStaff, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const { condition = 'available' } = req.body;
-      const booking = await storage.getBooking(id);
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-      if (booking.status !== BookingStatus.ACTIVE) {
-        return res.status(409).json({ message: "Booking is not active" });
-      }
-
-      await db.transaction(async (tx) => {
-        await tx.update(bookings).set({ 
-          status: BookingStatus.COMPLETED, 
-          checkedInAt: new Date(),
-          checkedInBy: req.user.id 
-        }).where(eq(bookings.id, id));
-        
-        await tx.update(assets).set({ 
-          status: condition === 'maintenance' ? AssetStatus.MAINTENANCE : AssetStatus.AVAILABLE,
-          isAvailable: condition !== 'maintenance'
-        }).where(eq(assets.id, booking.assetId));
-      });
-
-      res.json({ ok: true, message: "Gear returned" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to return gear" });
-    }
-  });
-
-  // Cancel Booking
-  app.post("/api/staff/bookings/:id/cancel", requireStaff, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const booking = await storage.getBooking(id);
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-      if (booking.status !== BookingStatus.PENDING) {
-        return res.status(409).json({ message: "Can only cancel pending bookings" });
-      }
-
-      await storage.updateBookingStatus(id, BookingStatus.CANCELLED);
-      res.json({ ok: true, message: "Booking cancelled" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to cancel booking" });
     }
   });
 
@@ -1120,182 +1069,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Staff Scan Endpoint
-  app.get("/api/staff/scan", requireStaff, async (req: any, res) => {
-    try {
-      const { code } = req.query;
-      if (!code) return res.status(400).json({ message: "No scan code provided" });
-
-      const booking = await storage.getBookingByQRToken(code);
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found", barcode: code });
-      }
-
-      const asset = await storage.getAsset(booking.assetId);
-      const member = await storage.getUser(booking.userId);
-
-      res.json({
-        ok: true,
-        booking,
-        asset,
-        member: member ? {
-          firstName: member.firstName,
-          lastName: member.lastName,
-          email: member.email
-        } : null
-      });
-    } catch (error) {
-      console.error("Scan error:", error);
-      res.status(500).json({ message: "Server error during scan" });
-    }
-  });
-
-  // Start Adventure
-  app.post("/api/staff/bookings/:id/start", requireStaff, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const booking = await storage.getBooking(id);
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-      if (booking.status !== BookingStatus.PENDING) {
-        return res.status(409).json({ message: `Cannot start adventure from state: ${booking.status}` });
-      }
-
-      await db.transaction(async (tx) => {
-        await tx.update(bookings).set({ 
-          status: BookingStatus.ACTIVE, 
-          checkedOutAt: new Date(),
-          checkedOutBy: req.user.id 
-        }).where(eq(bookings.id, id));
-        
-        await tx.update(assets).set({ 
-          status: 'active',
-          isAvailable: false
-        }).where(eq(assets.id, booking.assetId));
-      });
-
-      res.json({ ok: true, message: "Adventure started" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to start adventure" });
-    }
-  });
-
-  // Return Adventure
-  app.post("/api/staff/bookings/:id/return", requireStaff, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const { condition = 'available' } = req.body;
-      const booking = await storage.getBooking(id);
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-      if (booking.status !== BookingStatus.ACTIVE) {
-        return res.status(409).json({ message: "Booking is not active" });
-      }
-
-      await db.transaction(async (tx) => {
-        await tx.update(bookings).set({ 
-          status: BookingStatus.COMPLETED, 
-          checkedInAt: new Date(),
-          checkedInBy: req.user.id 
-        }).where(eq(bookings.id, id));
-        
-        await tx.update(assets).set({ 
-          status: condition === 'maintenance' ? AssetStatus.MAINTENANCE : AssetStatus.AVAILABLE,
-          isAvailable: condition !== 'maintenance'
-        }).where(eq(assets.id, booking.assetId));
-      });
-
-      res.json({ ok: true, message: "Gear returned" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to return gear" });
-    }
-  });
-
-  // Cancel Booking
-  app.post("/api/staff/bookings/:id/cancel", requireStaff, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const booking = await storage.getBooking(id);
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-      if (booking.status !== BookingStatus.PENDING) {
-        return res.status(409).json({ message: "Can only cancel pending bookings" });
-      }
-
-      await storage.updateBookingStatus(id, BookingStatus.CANCELLED);
-      res.json({ ok: true, message: "Booking cancelled" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to cancel booking" });
-    }
-  });
-
-  // Staff Dashboard Metrics
-  app.get("/api/staff/dashboard/today", requireStaff, async (req: any, res) => {
-    try {
-      const { date } = req.query;
-      const targetDate = date ? new Date(date as string) : new Date();
-      const startOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
-      const endOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59);
-
-      // Bookings scheduled for today
-      const todayBookings = await db.select().from(bookings)
-        .where(and(
-          gte(bookings.startDate, startOfToday),
-          lte(bookings.startDate, endOfToday)
-        ));
-
-      const bookingsWithDetails = await Promise.all(todayBookings.map(async (b) => {
-        const asset = await storage.getAsset(b.assetId);
-        const member = await storage.getUser(b.userId);
-        return {
-          id: b.id,
-          assetName: asset?.name || 'Unknown Asset',
-          assetId: b.assetId,
-          memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
-          status: b.status,
-          startTime: b.startDate.toISOString(),
-          qrToken: b.qrToken
-        };
-      }));
-
-      // Active Checkouts (Status: active)
-      const activeCheckouts = await db.select({ count: count() })
-        .from(bookings)
-        .where(eq(bookings.status, BookingStatus.ACTIVE));
-
-      // Pending Returns (Status: active AND end_date < now)
-      const now = new Date();
-      const pendingReturns = await db.select({ count: count() })
-        .from(bookings)
-        .where(and(
-          eq(bookings.status, BookingStatus.ACTIVE),
-          lt(bookings.endDate, now)
-        ));
-
-      // Inventory stats
-      const allAssets = await storage.getAssets();
-      const inventory = {
-        total: allAssets.length,
-        available: allAssets.filter(a => a.status === AssetStatus.AVAILABLE).length,
-        maintenance: allAssets.filter(a => a.status === AssetStatus.MAINTENANCE).length,
-        unavailable: allAssets.filter(a => a.status === AssetStatus.OUT_OF_SERVICE).length
-      };
-
-      res.json({
-        ok: true,
-        bookings: bookingsWithDetails,
-        inventory,
-        activeCheckouts: activeCheckouts[0]?.count || 0,
-        pendingReturns: pendingReturns[0]?.count || 0,
-        maintenanceItems: inventory.maintenance,
-        totalToday: todayBookings.length
-      });
-    } catch (error) {
-      console.error("Dashboard error:", error);
-      res.status(500).json({ ok: false, message: "Failed to fetch dashboard" });
-    }
-  });
-
   // Barcode scanning - lookup asset by barcode
   app.post("/api/staff/scan", requireStaff, async (req: any, res) => {
     try {
@@ -1331,8 +1104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(bookings.assetId, asset.id),
             or(
-              eq(bookings.status, BookingStatus.CONFIRMED),
-              eq(bookings.status, BookingStatus.CHECKED_OUT)
+              eq(bookings.status, BookingStatus.PENDING),
+              eq(bookings.status, BookingStatus.ACTIVE)
             )
           )
         )
@@ -1889,39 +1662,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!targetAsset) {
-        const assetType = (type || 'gear').toLowerCase().trim();
-        console.log(`[BOOKING] No direct asset match for benefitId="${benefitId}". Searching by type="${assetType}"`);
+        const requestedType = (type || '').toLowerCase().trim();
+        const requestedTitle = (benefitTitle || '').toLowerCase().trim();
+        console.log(`[BOOKING] No direct asset match for benefitId="${benefitId}". Searching by category/name for "${requestedType}" / "${requestedTitle}"`);
 
-        const availableAsset = await storage.findAvailableAsset(assetType, startDate, endDate);
+        const availableAsset = await storage.findAvailableAssetByCategory(requestedType, requestedTitle, startDate, endDate);
         if (availableAsset) {
           targetAsset = availableAsset;
-        } else {
-          const allAssetsOfType = await storage.getAssets({ type: assetType });
+          console.log(`[BOOKING] Found matching asset by category: "${availableAsset.name}" (id: ${availableAsset.id})`);
+        }
 
-          if (allAssetsOfType.length === 0) {
-            const allGearAssets = await storage.getAssets({ type: 'gear' });
-            if (allGearAssets.length > 0) {
-              const available = await storage.findAvailableAsset('gear', startDate, endDate);
-              if (available) {
-                targetAsset = available;
-                console.log(`[BOOKING] Fallback: using gear asset "${available.name}" (id: ${available.id})`);
-              }
-            }
-
-            if (!targetAsset) {
-              console.error(`[BOOKING] No assets of type "${assetType}" or "gear" exist in the database`);
-              return res.status(404).json({
-                message: `No "${assetType}" equipment found in the system. Please contact admin.`,
-                code: 'EQUIPMENT_NOT_FOUND',
-                details: { assetType }
-              });
-            }
-          } else {
-            return res.status(409).json({
-              message: "No assets available for the selected time slot (including buffer periods).",
-              code: 'NO_AVAILABILITY'
-            });
-          }
+        if (!targetAsset) {
+          console.error(`[BOOKING] No available assets matching "${requestedType}" / "${requestedTitle}"`);
+          return res.status(404).json({
+            message: `No "${requestedType || 'gear'}" equipment available. Please contact admin or try a different time.`,
+            code: 'EQUIPMENT_NOT_FOUND',
+            details: { requestedType, benefitId }
+          });
         }
       }
 
@@ -1954,7 +1711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.createBookingWithCredits({
         userId: req.user.id,
         assetId: targetAsset.id,
-        status: BookingStatus.CONFIRMED,
+        status: BookingStatus.PENDING,
         startDate,
         endDate,
         totalAmount: 0,
@@ -1971,10 +1728,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: date,
         time: time,
         location: location || targetAsset.location || 'TBD',
-        status: 'upcoming',
+        status: 'pending',
         type: type || targetAsset.type || 'gear',
         duration: duration || 'Full day',
         qrCode: booking.qrCode,
+        qrToken: booking.qrToken,
       };
 
       res.status(201).json(formattedBooking);
@@ -2008,16 +1766,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(bookings.userId, user.id))
         .orderBy(desc(bookings.createdAt));
 
-      // Format bookings for frontend
       const formattedBookings = userBookings.map(({ booking, asset }) => {
-        // Determine status based on booking status
-        let frontendStatus = 'upcoming';
+        let frontendStatus = 'pending';
         if (booking.status === BookingStatus.ACTIVE) {
           frontendStatus = 'active';
-        } else if (booking.status === 'completed') {
+        } else if (booking.status === BookingStatus.COMPLETED) {
           frontendStatus = 'completed';
         } else if (booking.status === BookingStatus.CANCELLED) {
           frontendStatus = 'cancelled';
+        } else if (booking.checkedInAt) {
+          frontendStatus = 'completed';
+        } else if (booking.checkedOutAt) {
+          frontendStatus = 'active';
+        } else {
+          frontendStatus = 'pending';
         }
 
         // Map asset type to booking type
@@ -2058,6 +1820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: bookingType,
           duration: 'Full day',
           qrCode: booking.qrCode || undefined,
+          qrToken: booking.qrToken || undefined,
           checkInTime: booking.checkedInAt ? booking.checkedInAt.toTimeString().substring(0, 5) : undefined,
           checkOutTime: booking.checkedOutAt ? booking.checkedOutAt.toTimeString().substring(0, 5) : undefined,
           notes: booking.damageNotes || undefined,
@@ -2317,8 +2080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lte(bookings.startDate, tomorrow),
         or(
           eq(bookings.status, BookingStatus.PENDING),
-          eq(bookings.status, BookingStatus.CONFIRMED),
-          eq(bookings.status, BookingStatus.CHECKED_OUT)
+          eq(bookings.status, BookingStatus.ACTIVE)
         )
       ];
       if (assetFilter) bookingConditions.unshift(assetFilter);

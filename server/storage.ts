@@ -371,7 +371,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBookingByQRToken(qrToken: string): Promise<Booking | undefined> {
-    const [booking] = await db.select().from(bookings).where(eq(bookings.qrToken, qrToken));
+    const [booking] = await db.select().from(bookings).where(
+      or(eq(bookings.qrToken, qrToken), eq(bookings.qrCode, qrToken))
+    );
     return booking || undefined;
   }
 
@@ -447,15 +449,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findAvailableAsset(type: string, startDate: Date, endDate: Date): Promise<Asset | undefined> {
-    // 1. Get all assets of this type
     const candidateAssets = await this.getAssets({ type, available: true });
 
-    // 2. Check each for conflicts
     for (const asset of candidateAssets) {
       const hasConflict = await this.checkBookingConflicts(asset.id, startDate, endDate);
       if (!hasConflict) {
         return asset;
       }
+    }
+
+    return undefined;
+  }
+
+  async findAvailableAssetByCategory(requestedType: string, requestedTitle: string, startDate: Date, endDate: Date): Promise<Asset | undefined> {
+    const allAssets = await this.getAssets({ available: true });
+
+    const categoryKeywords: Record<string, string[]> = {
+      'kayak': ['kayak', 'canoe', 'paddle', 'water'],
+      'bike': ['bike', 'bicycle', 'cycling', 'mountain bike'],
+      'camping': ['camp', 'tent', 'sleeping', 'camping'],
+      'hiking': ['hike', 'hiking', 'trek', 'trail', 'backpack'],
+    };
+
+    const keywords = categoryKeywords[requestedType] || [requestedType];
+
+    const matchingAssets = allAssets.filter(asset => {
+      const name = (asset.name || '').toLowerCase();
+      const category = (asset.category || '').toLowerCase();
+      const desc = (asset.description || '').toLowerCase();
+
+      return keywords.some(kw =>
+        name.includes(kw) || category.includes(kw) || desc.includes(kw)
+      );
+    });
+
+    if (matchingAssets.length === 0 && requestedTitle) {
+      const titleWords = requestedTitle.split(/\s+/).filter(w => w.length > 2);
+      const titleMatches = allAssets.filter(asset => {
+        const name = (asset.name || '').toLowerCase();
+        return titleWords.some(word => name.includes(word));
+      });
+
+      for (const asset of titleMatches) {
+        const hasConflict = await this.checkBookingConflicts(asset.id, startDate, endDate);
+        if (!hasConflict) return asset;
+      }
+    }
+
+    for (const asset of matchingAssets) {
+      const hasConflict = await this.checkBookingConflicts(asset.id, startDate, endDate);
+      if (!hasConflict) return asset;
     }
 
     return undefined;
@@ -700,6 +743,9 @@ export class DatabaseStorage implements IStorage {
       const bookingId = crypto.randomUUID();
       console.log(`[BOOKING_TX] Creating booking ${bookingId} for asset ${bookingData.assetId}`);
 
+      const qrToken = `ACB-${crypto.randomUUID()}`;
+      const endDate = new Date(bookingData.endDate);
+      const bufferEnd = new Date(endDate.getTime() + 60 * 60 * 1000);
       tx
         .insert(bookings)
         .values({
@@ -707,7 +753,9 @@ export class DatabaseStorage implements IStorage {
           id: bookingId,
           creditsUsed: actualCreditsUsed.toFixed(2),
           paidWithCredits,
-          qrCode: `AC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          qrToken,
+          qrCode: qrToken,
+          bufferEnd,
         })
         .run();
 
