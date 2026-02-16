@@ -1828,35 +1828,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Get staff member's assigned locations
-      const staffLocations = await db
-        .select({ locationId: userLocations.locationId })
-        .from(userLocations)
-        .where(eq(userLocations.userId, req.user.id));
+      console.log(`[STAFF_DASHBOARD] User: ${req.user.id}, date range: ${today.toISOString()} to ${tomorrow.toISOString()}`);
 
-      const locationIds = staffLocations.map(sl => sl.locationId);
-      // Use only the primary location (first one) for dashboard inventory stats
-      const primaryLocationId = locationIds.length > 0 ? locationIds[0] : null;
-
-      // Get inventory for staff member's primary location only
-      const locationInventoryData = primaryLocationId
-        ? await db
-          .select()
-          .from(locationInventory)
-          .where(eq(locationInventory.locationId, primaryLocationId))
-        : [];
-
-      const assetIds = locationInventoryData.map(li => li.assetId);
-
-      // Get assets for those locations
-      const locationAssets = assetIds.length > 0
-        ? await db
-          .select()
-          .from(assets)
-          .where(inArray(assets.id, assetIds))
-        : [];
-
-      // Get today's bookings for staff's location assets
+      // Get today's bookings - show ALL bookings (same as Schedule page logic)
       const todaysBookings = await db
         .select({
           booking: bookings,
@@ -1868,69 +1842,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(users, eq(bookings.userId, users.id))
         .where(
           and(
-            assetIds.length > 0 ? inArray(bookings.assetId, assetIds) : sql`false`,
             gte(bookings.startDate, today),
-            lte(bookings.startDate, tomorrow),
+            lt(bookings.startDate, tomorrow),
             or(
-              eq(bookings.status, 'pending'),
-              eq(bookings.status, 'confirmed'),
-              eq(bookings.status, 'checked_out')
+              eq(bookings.status, BookingStatus.PENDING),
+              eq(bookings.status, BookingStatus.CONFIRMED),
+              eq(bookings.status, BookingStatus.CHECKED_OUT),
+              eq(bookings.status, BookingStatus.CHECKED_IN)
             )
           )
         )
         .orderBy(bookings.startDate);
 
-      // Get inventory stats for location assets
-      // Calculate total quantity from inventory records
-      const totalQuantity = locationInventoryData.reduce((sum, inv) => sum + (inv.quantity || 0), 0);
+      console.log(`[STAFF_DASHBOARD] Today's bookings found: ${todaysBookings.length}`);
 
-      // Calculate available count by quantity (items available and not in maintenance)
-      const availableCount = locationInventoryData.reduce((sum, inv) => {
-        const asset = locationAssets.find(a => a.id === inv.assetId);
-        if (asset && asset.isAvailable && !asset.maintenanceMode) {
-          return sum + (inv.quantity || 0);
-        }
-        return sum;
-      }, 0);
+      // Get ALL assets for inventory stats (not location-scoped, to avoid zero counts)
+      const allAssets = await db.select().from(assets);
+      const totalItems = allAssets.length;
+      const maintenanceItems = allAssets.filter(a => a.maintenanceMode || a.status === 'maintenance').length;
+      const availableItems = allAssets.filter(a => a.isAvailable && !a.maintenanceMode).length;
+      const unavailableItems = totalItems - availableItems - maintenanceItems;
 
-      // Calculate maintenance count by quantity
-      const maintenanceCount = locationInventoryData.reduce((sum, inv) => {
-        const asset = locationAssets.find(a => a.id === inv.assetId);
-        if (asset && asset.maintenanceMode) {
-          return sum + (inv.quantity || 0);
-        }
-        return sum;
-      }, 0);
+      console.log(`[STAFF_DASHBOARD] Inventory: total=${totalItems}, available=${availableItems}, maintenance=${maintenanceItems}`);
 
-      // Calculate unavailable count by quantity
-      const unavailableCount = locationInventoryData.reduce((sum, inv) => {
-        const asset = locationAssets.find(a => a.id === inv.assetId);
-        if (asset && !asset.isAvailable) {
-          return sum + (inv.quantity || 0);
-        }
-        return sum;
-      }, 0);
+      // Get active checkouts (pending returns) across all assets
+      const activeCheckoutsResult = await db
+        .select({ count: count() })
+        .from(bookings)
+        .where(eq(bookings.status, BookingStatus.CHECKED_OUT));
+      const pendingReturns = activeCheckoutsResult[0]?.count || 0;
 
-      // Get pending check-ins for location assets
-      const pendingCheckIns = assetIds.length > 0
-        ? await db
-          .select()
-          .from(bookings)
-          .where(
-            and(
-              inArray(bookings.assetId, assetIds),
-              eq(bookings.status, 'checked_out')
-            )
-          )
-          .orderBy(bookings.startDate)
-        : [];
+      console.log(`[STAFF_DASHBOARD] Pending returns: ${pendingReturns}`);
 
       res.json({
         bookings: todaysBookings.map(({ booking, asset, user }) => ({
           id: booking.id,
           assetName: asset?.name || 'Unknown',
           assetId: asset?.id,
-          memberName: `${user?.firstName} ${user?.lastName}`,
+          memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
           memberEmail: user?.email,
           status: booking.status,
           startTime: booking.startDate,
@@ -1939,12 +1888,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           checkedInAt: booking.checkedInAt,
         })),
         inventory: {
-          total: totalQuantity,
-          available: availableCount,
-          maintenance: maintenanceCount,
-          unavailable: unavailableCount,
+          total: totalItems,
+          available: availableItems,
+          maintenance: maintenanceItems,
+          unavailable: unavailableItems,
         },
-        pendingCheckIns: pendingCheckIns.length,
+        pendingCheckIns: pendingReturns,
         totalToday: todaysBookings.length,
       });
     } catch (error) {
