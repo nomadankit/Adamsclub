@@ -9,12 +9,23 @@ import { Calendar, Clock, Plus, QrCode, Star, Gift, Users, Mountain, Compass, Ch
 import { useLocation } from "wouter"
 import { useState } from "react"
 import QRCodeGenerator from 'qrcode'
-import { useQueryClient } from "@tanstack/react-query"
+import { useQueryClient, useQuery } from "@tanstack/react-query"
 
 export function MemberDashboard() {
   const { user } = useAuth()
   const [, setLocation] = useLocation()
   const [showBookingModal, setShowBookingModal] = useState(false)
+  
+  const { data: apiBookings = [], isLoading } = useQuery({
+    queryKey: ['bookings'],
+    queryFn: async () => {
+      const response = await fetch('/api/bookings', {
+        credentials: 'include'
+      })
+      if (!response.ok) throw new Error('Failed to fetch bookings')
+      return response.json()
+    }
+  })
   const [selectedBenefit, setSelectedBenefit] = useState<any>(null)
   const [bookingStep, setBookingStep] = useState<'select' | 'details' | 'confirm'>('select')
   const [bookingInProgress, setBookingInProgress] = useState(false)
@@ -375,30 +386,47 @@ export function MemberDashboard() {
         <section className="py-2">
           <div className="max-w-6xl mx-auto">
             <h2 className="text-lg font-bold font-['Poppins'] mb-4">Upcoming Adventures</h2>
-            <Card className="mb-6 border-blue-100 dark:border-blue-900 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-card">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                      <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Kayak Adventure</h3>
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>Tomorrow • 9:00 AM</span>
+            {isLoading ? (
+              <div className="animate-pulse flex space-x-4">
+                <div className="flex-1 space-y-4 py-1">
+                  <div className="h-20 bg-muted rounded"></div>
+                </div>
+              </div>
+            ) : apiBookings.filter((b: any) => b.status === 'pending').length > 0 ? (
+              apiBookings.filter((b: any) => b.status === 'pending').map((booking: any) => (
+                <Card key={booking.id} className="mb-6 border-blue-100 dark:border-blue-900 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-card" onClick={() => setLocation('/bookings')}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                          <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">{booking.benefitTitle}</h3>
+                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>{new Date(booking.startDate).toLocaleDateString()} • {new Date(booking.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 font-semibold">
+                          Ready
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">QR pass ready</p>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 font-semibold">
-                      Ready
-                    </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">QR pass ready</p>
-                  </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="mb-6 border-dashed border-2 flex items-center justify-center p-8 text-muted-foreground">
+                <div className="text-center">
+                  <Compass className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">No upcoming adventures scheduled</p>
                 </div>
-              </CardContent>
-            </Card>
+              </Card>
+            )}
           </div>
         </section>
 
