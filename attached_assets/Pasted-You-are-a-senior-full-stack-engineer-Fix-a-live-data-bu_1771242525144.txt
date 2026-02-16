@@ -1,0 +1,195 @@
+You are a senior full-stack engineer. Fix a live-data bug in my Adam’s Club Staff Panel.
+
+Problem
+
+Bookings are now being created successfully. Staff can see new bookings correctly in Staff → Schedule page.
+But in Staff → Dashboard, all metric cards stay stuck at 0 even after reload:
+
+Today’s Bookings: 0
+
+Active Checkouts: 0
+
+Pending Returns: 0
+
+Maintenance Items: 0
+
+Inventory Overview:
+
+Total Items: 0
+
+Available: 0
+
+In Maintenance: 0
+
+So the dashboard is not reading or computing live data properly, even though the data exists (Schedule page proves it).
+
+Goal
+
+Make the Staff Dashboard show accurate real-time metrics matching the underlying database and business logic, and keep Schedule working.
+
+Required work (do in this exact order)
+1) Trace data flow for Dashboard vs Schedule
+
+Find the dashboard page component (likely client/src/pages/staff/Dashboard.tsx or similar) and list every API call it makes (URL, method, query params, headers).
+
+Find the schedule page component and list its API call(s).
+
+Compare:
+
+auth/role requirements (staff token, permissions)
+
+query params (date range, timezone, location, clubId/orgId)
+
+filtering logic (statuses counted)
+
+caching behavior (React Query/SWR, staleTime, cache keys)
+
+Confirm which endpoint is responsible for each dashboard card:
+
+Today’s Bookings
+
+Active Checkouts
+
+Pending Returns
+
+Maintenance Items
+
+Inventory Overview totals
+
+2) Confirm whether the dashboard endpoint is failing silently
+
+Inspect network requests in code: confirm if dashboard endpoints return:
+
+401/403 (auth)
+
+200 but empty/zero counts (logic bug)
+
+500 (server error)
+
+If UI currently defaults to 0 on error, change it to show an error state (do not silently show 0).
+
+3) Fix the most likely root causes (must check ALL)
+A) Wrong date/timezone window
+
+“Today’s Bookings” can be wrong if computed in UTC while Schedule uses local time.
+
+Implement a single helper that computes today’s start/end using the same timezone as Schedule (or configured club timezone).
+
+Ensure both Schedule and Dashboard use the same “today” boundaries.
+
+B) Wrong statuses counted
+
+Dashboard may count only CONFIRMED or only ACTIVE, while bookings are stored as PENDING or another status.
+
+Align dashboard counting rules with how bookings are created and what Schedule displays.
+
+If required, adjust booking creation status OR dashboard query filters.
+
+C) Wrong tenant/location scope
+
+If multi-tenant or location-based:
+
+ensure dashboard queries include correct orgId/clubId/locationId
+
+ensure the staff token provides the same scope the schedule page uses
+
+Fix mismatched IDs or missing filters.
+
+D) Caching / stale query data
+
+If using React Query/TanStack Query or SWR:
+
+ensure dashboard query keys include all inputs (date/tz/location/staff role)
+
+reduce staleTime if too high
+
+add refetchOnWindowFocus: true
+
+invalidate dashboard queries whenever bookings/checkouts/returns change
+
+If server sets cache headers, remove caching for dashboard metrics.
+
+E) Dashboard using wrong DB table/collection or joins
+
+Ensure metrics read from the same booking records that the schedule uses.
+
+Verify correct relationships: booking → equipment/item → inventory status.
+
+4) Implement a single authoritative metrics endpoint
+
+Create (or fix) a dedicated endpoint such as:
+
+GET /api/staff/dashboard-metrics?date=YYYY-MM-DD&tz=<IANA_TZ>&locationId=<id>
+
+Return JSON like:
+
+{
+  "todaysBookings": 12,
+  "activeCheckouts": 3,
+  "pendingReturns": 1,
+  "maintenanceItems": 2,
+  "inventory": {
+    "totalItems": 40,
+    "available": 28,
+    "inMaintenance": 2
+  }
+}
+
+
+Rules:
+
+Use aggregated DB queries (count) not fetching all rows.
+
+Must match Schedule page business rules.
+
+Must return correct values for the same staff user who can see bookings in Schedule.
+
+5) Fix client dashboard rendering + refresh behavior
+
+Dashboard must fetch the metrics endpoint and map fields to the cards:
+
+Today’s Bookings
+
+Active Checkouts
+
+Pending Returns
+
+Maintenance Items
+
+Inventory Overview totals
+
+Add auto-refresh:
+
+refetch every 30–60 seconds OR invalidate on relevant mutations
+
+Add a manual “Refresh” action as fallback.
+
+Ensure it does not show 0 by default when request fails.
+
+6) Add logging + verification steps
+
+Add temporary logs (remove or gate under DEV):
+
+Server logs: request user role, scope (org/location), tz, date range, query filters, final counts.
+
+Client logs: response payload and status code.
+
+Verification checklist (must provide):
+
+Create a booking → Schedule shows it → Dashboard “Today’s Bookings” updates correctly.
+
+Reload dashboard page → metrics remain correct (not all zeros).
+
+Change date/time (if supported) → counts change predictably.
+
+Inventory Overview counts reflect actual inventory items and their statuses.
+
+Deliverables
+
+Explain the root cause (why Schedule sees it but Dashboard stays 0).
+
+Provide exact file changes.
+
+Provide the final endpoint + final client implementation.
+
+Start now by locating the dashboard component + its API calls, then the server route(s) powering it, then align logic with Schedule.
