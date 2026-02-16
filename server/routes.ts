@@ -1830,7 +1830,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[STAFF_DASHBOARD] User: ${req.user.id}, date range: ${today.toISOString()} to ${tomorrow.toISOString()}`);
 
-      // Get today's bookings - show ALL bookings (same as Schedule page logic)
+      // Try to get staff member's assigned locations for scoping
+      const staffLocations = await db
+        .select({ locationId: userLocations.locationId })
+        .from(userLocations)
+        .where(eq(userLocations.userId, req.user.id));
+
+      const locationIds = staffLocations.map(sl => sl.locationId);
+      const hasLocationScope = locationIds.length > 0;
+
+      // Build asset ID list: from locationInventory if staff has locations, otherwise ALL assets
+      let scopedAssetIds: string[] = [];
+      let scopedAssets: any[] = [];
+
+      if (hasLocationScope) {
+        const locationInventoryData = await db
+          .select()
+          .from(locationInventory)
+          .where(inArray(locationInventory.locationId, locationIds));
+
+        scopedAssetIds = locationInventoryData.map(li => li.assetId);
+
+        if (scopedAssetIds.length > 0) {
+          scopedAssets = await db.select().from(assets).where(inArray(assets.id, scopedAssetIds));
+        }
+
+        // If location exists but has no inventory records, fall back to all assets
+        if (scopedAssets.length === 0) {
+          console.log(`[STAFF_DASHBOARD] Staff has locations but no inventory records - falling back to all assets`);
+          scopedAssets = await db.select().from(assets);
+          scopedAssetIds = scopedAssets.map(a => a.id);
+        }
+      } else {
+        console.log(`[STAFF_DASHBOARD] Staff has no location assignments - showing all data`);
+        scopedAssets = await db.select().from(assets);
+        scopedAssetIds = scopedAssets.map(a => a.id);
+      }
+
+      // Build booking filter - scope to assets if we have them, else show all
+      const assetFilter = scopedAssetIds.length > 0
+        ? inArray(bookings.assetId, scopedAssetIds)
+        : undefined;
+
+      // Get today's bookings matching Schedule page statuses
+      const bookingConditions = [
+        gte(bookings.startDate, today),
+        lte(bookings.startDate, tomorrow),
+        or(
+          eq(bookings.status, BookingStatus.PENDING),
+          eq(bookings.status, BookingStatus.CONFIRMED),
+          eq(bookings.status, BookingStatus.CHECKED_OUT)
+        )
+      ];
+      if (assetFilter) bookingConditions.unshift(assetFilter);
+
       const todaysBookings = await db
         .select({
           booking: bookings,
@@ -1840,37 +1893,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(bookings)
         .leftJoin(assets, eq(bookings.assetId, assets.id))
         .leftJoin(users, eq(bookings.userId, users.id))
-        .where(
-          and(
-            gte(bookings.startDate, today),
-            lt(bookings.startDate, tomorrow),
-            or(
-              eq(bookings.status, BookingStatus.PENDING),
-              eq(bookings.status, BookingStatus.CONFIRMED),
-              eq(bookings.status, BookingStatus.CHECKED_OUT),
-              eq(bookings.status, BookingStatus.CHECKED_IN)
-            )
-          )
-        )
+        .where(and(...bookingConditions))
         .orderBy(bookings.startDate);
 
       console.log(`[STAFF_DASHBOARD] Today's bookings found: ${todaysBookings.length}`);
 
-      // Get ALL assets for inventory stats (not location-scoped, to avoid zero counts)
-      const allAssets = await db.select().from(assets);
-      const totalItems = allAssets.length;
-      const maintenanceItems = allAssets.filter(a => a.maintenanceMode || a.status === 'maintenance').length;
-      const availableItems = allAssets.filter(a => a.isAvailable && !a.maintenanceMode).length;
+      // Inventory stats from scoped assets
+      const totalItems = scopedAssets.length;
+      const maintenanceItems = scopedAssets.filter(a => a.maintenanceMode || a.status === 'maintenance').length;
+      const availableItems = scopedAssets.filter(a => a.isAvailable && !a.maintenanceMode).length;
       const unavailableItems = totalItems - availableItems - maintenanceItems;
 
       console.log(`[STAFF_DASHBOARD] Inventory: total=${totalItems}, available=${availableItems}, maintenance=${maintenanceItems}`);
 
-      // Get active checkouts (pending returns) across all assets
-      const activeCheckoutsResult = await db
+      // Get pending returns (checked_out bookings) scoped to same assets
+      const pendingConditions = [eq(bookings.status, BookingStatus.CHECKED_OUT)];
+      if (assetFilter) pendingConditions.unshift(assetFilter);
+
+      const pendingCheckIns = await db
         .select({ count: count() })
         .from(bookings)
-        .where(eq(bookings.status, BookingStatus.CHECKED_OUT));
-      const pendingReturns = activeCheckoutsResult[0]?.count || 0;
+        .where(and(...pendingConditions));
+      const pendingReturns = pendingCheckIns[0]?.count || 0;
 
       console.log(`[STAFF_DASHBOARD] Pending returns: ${pendingReturns}`);
 
