@@ -1,0 +1,291 @@
+You are a senior full-stack engineer. Audit and implement a robust, end-to-end QR scanning workflow for my Adam’s Club app so it works reliably and does not throw “Asset not found” errors.
+
+Current state + observed errors
+
+Users can now create bookings successfully.
+
+A QR is generated after booking, intended to be scanned by staff at the outpost.
+
+Staff panel has a Scan Equipment / Scan Booking page.
+
+Scanning currently fails with errors like:
+
+Toast: Asset Not Found
+
+HTTP 404 payload like: {"message":"Asset not found","barcode":"AC-1771242005910-yhlobrzr"}
+
+Some background logic still runs (status changes / credits, etc.) but scan-based workflow is broken/inconsistent.
+
+Required outcome
+
+Implement the workflow below as a single coherent system with correct data models, stable identifiers, consistent API, and a clear state machine. It must be resilient (no crashes), consistent (no partial updates), and observable (logs).
+
+The Workflow to Implement (must match exactly)
+1) Booking created (member)
+
+Member selects gear + time window and confirms booking.
+
+System creates a Booking record.
+
+System generates a QR token that represents the booking (not a random “asset” unless you explicitly map it).
+
+Member can view the QR in the booking confirmation and/or in “My Bookings”.
+
+2) Staff scans QR at outpost (check-out / start adventure)
+
+Staff opens staff panel scan page and scans member’s QR.
+
+System resolves QR → booking.
+
+Staff sees booking details and actions:
+
+Start Adventure (check out gear)
+
+Cancel Booking (pre-checkout cancellation)
+
+When staff starts adventure:
+
+booking state changes to ACTIVE
+
+inventory/asset status changes to CHECKED_OUT
+
+start timestamp recorded
+
+Must be atomic: booking + inventory updates succeed or fail together.
+
+3) During active adventure
+
+Booking remains ACTIVE.
+
+Staff schedule/dashboard reflects active checkouts.
+
+4) Return flow (check-in / collect gear)
+
+When member returns:
+
+Staff scans the SAME QR OR searches booking by ID/name if needed.
+
+Staff sees action: Collect Gear / Return
+
+On return confirmation:
+
+booking state becomes COMPLETED (or RETURNED)
+
+inventory/asset status becomes AVAILABLE (or MAINTENANCE if flagged)
+
+end timestamp recorded
+
+Must be atomic.
+
+5) Failure handling
+
+If booking not found / invalid QR:
+
+Return 404 JSON: { message, code, details }
+
+UI shows a friendly error
+
+Server must NOT crash
+
+If booking state doesn’t allow an action (e.g., return before start):
+
+Return 409 JSON with a clear message.
+
+Root issues you must diagnose and fix (do not skip)
+A) QR payload mismatch (most likely cause of “Asset not found”)
+
+Right now the scanner is hitting an endpoint that tries to resolve the scanned barcode as an Asset barcode, but your QR is generated for a Booking (or vice versa). Fix by making QR tokens and scan endpoints consistent.
+
+Hard requirement: Use stable identifiers
+
+QR must encode either:
+
+a signed token that maps to bookingId, OR
+
+a public bookingCode that maps to booking, OR
+
+a short qrToken stored on booking.
+
+Do NOT rely on parsing fragile strings without DB mapping.
+
+B) State machine must be explicit
+
+Define booking states and enforce transitions:
+
+PENDING (created, not started)
+
+ACTIVE (started/checked out)
+
+COMPLETED (returned)
+
+CANCELLED (cancelled before start)
+
+Allowed transitions:
+
+PENDING → ACTIVE (Start)
+
+PENDING → CANCELLED (Cancel)
+
+ACTIVE → COMPLETED (Return)
+Disallow all other transitions with 409.
+
+C) Ensure dashboard metrics are correct
+
+Dashboard nodes must be computed from the same sources:
+
+Today’s Bookings: count bookings created today (or scheduled today—be consistent)
+
+Active Checkouts: count ACTIVE
+
+Pending Returns: count ACTIVE with dueTime < now (or a defined rule)
+
+Maintenance Items: count inventory status MAINTENANCE
+
+Inventory Overview: total/available/inMaintenance from inventory table
+
+If schedule shows bookings but dashboard shows 0, your dashboard endpoint/filtering/timezone/status mapping is wrong. Fix as part of this work.
+
+D) Atomicity (no partial updates)
+
+When starting or returning an adventure, updates must be atomic:
+
+booking status update
+
+inventory status update
+
+any credit adjustments (if any happen here)
+Use DB transactions (Prisma/Drizzle/Knex/Mongoose sessions depending on stack).
+If transactions aren’t available, implement compensating rollback with extreme care.
+
+E) Observability
+
+Add structured logs (DEV only) for:
+
+scan input string
+
+resolved bookingId / assetId
+
+current booking status
+
+attempted action
+
+transaction begin/commit/rollback
+
+Implementation tasks (do in this order)
+1) Inspect the existing code
+
+Find:
+
+Where QR strings are generated (member booking confirmation, server util).
+
+Where scanning happens (staff scan page component).
+
+Which API endpoint scan calls.
+
+The server handler that returns 404 “Asset not found”.
+
+The DB schema/models: Booking, Equipment/Inventory/Asset, Checkouts.
+
+2) Decide: scanning resolves Booking, then maps to Assets
+
+Implement the scan endpoint as booking-first:
+
+Required endpoints
+
+GET /api/staff/scan?code=<qrString>
+
+Resolves QR string to booking (and includes booking + equipment details)
+
+POST /api/staff/bookings/:bookingId/start
+
+Validates state PENDING
+
+Sets booking ACTIVE, sets inventory CHECKED_OUT
+
+POST /api/staff/bookings/:bookingId/cancel
+
+Validates state PENDING
+
+Sets booking CANCELLED, restores inventory if reserved
+
+POST /api/staff/bookings/:bookingId/return
+
+Validates state ACTIVE
+
+Sets booking COMPLETED, sets inventory AVAILABLE (or MAINTENANCE)
+
+All endpoints must return consistent JSON:
+
+Success: { ok: true, data: ... }
+
+Error: { ok: false, message, code, details }
+
+3) Fix QR generation to match scan resolution
+
+Store qrToken (random, unique) on Booking.
+
+QR code should encode something like: ACB:<qrToken> (prefix for validation).
+
+Scan endpoint:
+
+validates prefix
+
+looks up booking by qrToken
+
+if not found: 404
+
+If you already have “AC-<timestamp>-<random>”, then:
+
+store that exact value in Booking.qrToken at creation time
+
+scan must look up Booking.qrToken, not Asset.barcode
+
+4) Fix staff scan UI
+
+When scan succeeds, show booking detail panel and action buttons:
+
+Start Adventure (if PENDING)
+
+Cancel (if PENDING)
+
+Collect/Return (if ACTIVE)
+
+If 404: show “Booking not found. Try manual entry.”
+
+Add “Enter Manually” to search by booking code/email.
+
+5) Fix dashboard metrics endpoint + refresh
+
+Implement GET /api/staff/dashboard-metrics?tz=<tz>&date=<YYYY-MM-DD>
+
+Ensure it uses correct timezone boundaries and correct statuses.
+
+Ensure staff dashboard actually calls this endpoint and renders returned values (not hardcoded 0).
+
+Add query invalidation or refetch every 30–60 seconds.
+
+6) Provide verification steps
+
+Must include:
+
+Create booking → QR appears for member
+
+Staff scans QR → booking details load
+
+Staff presses Start → booking becomes ACTIVE; schedule + dashboard reflect it
+
+Staff presses Return → booking becomes COMPLETED; inventory becomes AVAILABLE
+
+Invalid QR → clean 404 + UI error, no crash
+
+Deliverables you must output
+
+Root cause explanation for “Asset not found” given QR code format.
+
+List of files changed.
+
+Final endpoints + request/response examples.
+
+Confirmation that dashboard metrics now reflect real data (not stuck at 0).
+
+Do not stop early. Implement the full workflow and ensure no partial updates or server crashes.

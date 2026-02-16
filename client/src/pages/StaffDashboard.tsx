@@ -33,9 +33,9 @@ export default function StaffDashboard() {
 
   const { data: dashboardData, isLoading, isError, error, refetch, isFetching } = useQuery<StaffDashboardData>({
     queryKey: ['/api/staff/dashboard/today'],
-    refetchInterval: 30000,
+    refetchInterval: 15000,
     refetchOnWindowFocus: true,
-    staleTime: 10000,
+    staleTime: 5000,
     retry: 2,
   })
 

@@ -388,10 +388,6 @@ export class DatabaseStorage implements IStorage {
     return booking || undefined;
   }
 
-  async getBookingByQRToken(qrToken: string): Promise<Booking | undefined> {
-    const [booking] = await db.select().from(bookings).where(eq(bookings.qrToken, qrToken));
-    return booking || undefined;
-  }
 
   async updateBookingStatus(id: string, status: string): Promise<void> {
     await db
