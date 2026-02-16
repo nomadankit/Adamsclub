@@ -579,91 +579,92 @@ export default function Bookings() {
                               setShowDetailsModal(true)
                             }}
                           >
-                          <CardContent className="p-5">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex items-center space-x-3 flex-1">
-                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10">
-                                  {getIcon(booking.benefitIcon)}
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2 mb-1">
-                                    <h3 className="font-semibold text-lg">{booking.benefitTitle}</h3>
-                                    {getStatusBadge(booking.status)}
+                            <CardContent className="p-5">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center space-x-3 flex-1">
+                                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10">
+                                    {getIcon(booking.benefitIcon)}
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                                    <div className="flex items-center space-x-1">
-                                      <CalendarIcon className="h-3.5 w-3.5" />
-                                      <span>{formatDate(booking.date)}</span>
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <h3 className="font-semibold text-lg">{booking.benefitTitle}</h3>
+                                      {getStatusBadge(booking.status)}
                                     </div>
-                                    <div className="flex items-center space-x-1">
-                                      <Clock className="h-3.5 w-3.5" />
-                                      <span>{booking.time}</span>
-                                    </div>
-                                    <div className="flex items-center space-x-1">
-                                      <MapPin className="h-3.5 w-3.5" />
-                                      <span>{booking.location}</span>
+                                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                                      <div className="flex items-center space-x-1">
+                                        <CalendarIcon className="h-3.5 w-3.5" />
+                                        <span>{formatDate(booking.date)}</span>
+                                      </div>
+                                      <div className="flex items-center space-x-1">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        <span>{booking.time}</span>
+                                      </div>
+                                      <div className="flex items-center space-x-1">
+                                        <MapPin className="h-3.5 w-3.5" />
+                                        <span>{booking.location}</span>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                               </div>
-                              <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                            </div>
 
-                            {booking.status === 'active' && booking.checkInTime && (
-                              <div className="mt-3 pt-3 border-t border-border">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-muted-foreground">Checked in at {booking.checkInTime}</span>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleViewQR(booking)
-                                    }}
-                                  >
-                                    <QrCode className="h-3.5 w-3.5 mr-1.5" />
-                                    View QR
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-
-                            {booking.status === 'pending' && (booking as any).qrToken && (
-                              <div className="mt-3 pt-3 border-t border-border">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-2">
-                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                    <span className="text-sm font-medium">QR Pass Ready</span>
+                              {booking.status === 'active' && booking.checkInTime && (
+                                <div className="mt-3 pt-3 border-t border-border">
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Checked in at {booking.checkInTime}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleViewQR(booking)
+                                      }}
+                                    >
+                                      <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                                      View QR
+                                    </Button>
                                   </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleViewQR(booking)
-                                    }}
-                                  >
-                                    <QrCode className="h-3.5 w-3.5 mr-1.5" />
-                                    View QR
-                                  </Button>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
-                            {booking.notes && (
-                              <div className="mt-3 pt-3 border-t border-border">
-                                <p className="text-sm text-muted-foreground flex items-start space-x-2">
-                                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                                  <span>{booking.notes}</span>
-                                </p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))
-                    )}
-                  </TabsContent>
-                ))}
+                              {booking.status === 'pending' && (booking as any).qrToken && (
+                                <div className="mt-3 pt-3 border-t border-border">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                      <span className="text-sm font-medium">QR Pass Ready</span>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleViewQR(booking)
+                                      }}
+                                    >
+                                      <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                                      View QR
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {booking.notes && (
+                                <div className="mt-3 pt-3 border-t border-border">
+                                  <p className="text-sm text-muted-foreground flex items-start space-x-2">
+                                    <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                    <span>{booking.notes}</span>
+                                  </p>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </TabsContent>
+                  );
+                })}
               </Tabs>
             )}
           </div>
