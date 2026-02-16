@@ -475,6 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to return gear" });
     }
   });
+  app.get("/api/dashboard/metrics", requireAdmin, async (req: any, res) => {
     try {
       const now = new Date();
       const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -612,6 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching dashboard metrics:", error);
       res.status(500).json({ message: "Failed to fetch dashboard metrics" });
     }
+  });
 
   app.get("/api/staff/scan", requireStaff, async (req: any, res) => {
     try {
