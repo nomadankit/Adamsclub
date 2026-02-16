@@ -548,9 +548,11 @@ export default function Bookings() {
                 </TabsList>
 
                 {(['pending', 'active', 'completed', 'cancelled'] as BookingStatus[]).map(status => {
-                  const displayBookings = status === 'cancelled' 
-                    ? [...filteredBookings, ...expiredBookings.map(b => ({ ...b, notes: 'Expired (Time passed)' }))]
-                    : filteredBookings;
+                  const displayBookings = status === 'pending'
+                    ? filteredBookings
+                    : status === 'cancelled'
+                      ? [...filteredBookings, ...expiredBookings.map(b => ({ ...b, notes: 'Expired (Time passed)' }))]
+                      : filteredBookings;
 
                   return (
                     <TabsContent key={status} value={status} className="space-y-4">
