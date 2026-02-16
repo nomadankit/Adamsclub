@@ -61,6 +61,10 @@ export default function StaffDashboard() {
   const todayBookings = dashboardData?.totalToday ?? 0
   const activeCheckouts = dashboardData?.activeCheckouts ?? 0
   const pendingCheckIns = dashboardData?.pendingReturns ?? 0
+  
+  // Count only non-expired pending bookings for "Today's Bookings" stat consistency
+  const activePendingToday = dashboardData?.bookings?.filter(b => b.status === 'pending' && !(b as any).isExpired).length ?? 0
+  
   const inventoryTotal = dashboardData?.inventory?.total ?? 0
   const inventoryAvailable = dashboardData?.inventory?.available ?? 0
   const maintenanceItems = dashboardData?.inventory?.maintenance ?? 0

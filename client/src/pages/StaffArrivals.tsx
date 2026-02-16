@@ -46,8 +46,10 @@ export default function StaffArrivals() {
   }
 
   const bookings = dashboard?.bookings || []
-  const pending = bookings.filter(b => b.status === 'pending')
+  // Filter out expired bookings from "Awaiting Pickup" to match member view
+  const pending = bookings.filter(b => b.status === 'pending' && !(b as any).isExpired)
   const checkedOut = bookings.filter(b => b.status === 'active')
+  const expired = bookings.filter(b => b.status === 'pending' && (b as any).isExpired)
 
   return (
     <div className="min-h-screen bg-background">
@@ -213,6 +215,44 @@ export default function StaffArrivals() {
                   </Card>
                 )}
               </div>
+
+              {/* Expired Section */}
+              {expired.length > 0 && (
+                <div data-testid="section-expired">
+                  <h2 className="text-2xl font-bold font-['Poppins'] mb-4 text-amber-600">
+                    Expired Today ({expired.length})
+                  </h2>
+                  <div className="space-y-3 opacity-75">
+                    {expired.map((booking) => (
+                      <Card
+                        key={booking.id}
+                        className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30"
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h3 className="font-semibold text-lg text-muted-foreground">{booking.memberName}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Missed: {booking.assetName}
+                              </p>
+                              <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Scheduled: {new Date(booking.startTime).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="text-amber-600 border-amber-600">
+                              Expired
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>

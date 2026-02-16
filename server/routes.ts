@@ -690,12 +690,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bookingsWithDetails = await Promise.all(todayBookings.map(async (b) => {
         const asset = await storage.getAsset(b.assetId);
         const member = await storage.getUser(b.userId);
+        
+        // Check if expired (time passed and still pending)
+        let isExpired = false;
+        if (b.status === BookingStatus.PENDING) {
+          const bookingDate = new Date(b.startDate);
+          // b.startDate in DB might already have the time set if it was created correctly
+          // but our code usually stores date and time separately or combines them.
+          // Let's assume startDate is the canonical datetime.
+          if (bookingDate < new Date()) {
+            isExpired = true;
+          }
+        }
+
         return {
           id: b.id,
           assetName: asset?.name || 'Unknown Asset',
           assetId: b.assetId,
           memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
           status: b.status,
+          isExpired,
           startTime: b.startDate.toISOString(),
           qrToken: b.qrToken
         };
