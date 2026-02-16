@@ -397,6 +397,7 @@ export default function Bookings() {
     .filter(b => {
       if (activeTab === 'upcoming') return b.status === 'pending';
       if (activeTab === 'active') return b.status === 'active';
+      if (activeTab === 'completed') return b.status === 'completed';
       return b.status === activeTab;
     })
     .filter(b => filterType === 'all' || b.type === filterType)
@@ -409,6 +410,7 @@ export default function Bookings() {
     return mockBookings.filter(b => {
       if (status === 'upcoming') return b.status === 'pending';
       if (status === 'active') return b.status === 'active';
+      if (status === 'completed') return b.status === 'completed';
       return b.status === status;
     }).length
   }
