@@ -430,19 +430,19 @@ export class DatabaseStorage implements IStorage {
       )
     ];
 
-    if (excludeBookingId) {
-      baseConditions.push(sql`${bookings.id} != ${excludeBookingId}`);
-    }
+    let query = db.select().from(bookings).where(and(...baseConditions));
 
-    // Filter out cancelled bookings
-    baseConditions.push(sql`${bookings.status} != 'cancelled'`);
+    // Filter out cancelled bookings explicitly if needed (redundant with the 'or' block above but safe)
+    // Actually the 'or' block above already limits statuses.
+    
+    const conflicts = await query;
+    
+    // Final check for ID exclusion
+    const filteredConflicts = excludeBookingId 
+      ? conflicts.filter(c => c.id !== excludeBookingId)
+      : conflicts;
 
-    const conflicts = await db
-      .select()
-      .from(bookings)
-      .where(and(...baseConditions));
-
-    return conflicts.length > 0;
+    return filteredConflicts.length > 0;
   }
 
   async findAvailableAsset(type: string, startDate: Date, endDate: Date): Promise<Asset | undefined> {

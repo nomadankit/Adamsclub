@@ -1439,9 +1439,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Find an available asset of the requested type/benefit
         // Map benefitId/type to asset type
         const assetType = type || 'gear'; // default to gear
+        
+        console.log(`[BOOKING] Looking for available asset of type: ${assetType} for range ${startDate} to ${endDate}`);
 
         const availableAsset = await storage.findAvailableAsset(assetType, startDate, endDate);
         if (!availableAsset) {
+          // EMERGENCY FALLBACK: If no asset is found but we are in a demo/dev environment,
+          // check if we can just pick ANY asset of that type if there are no assets at all.
+          const allAssetsOfType = await storage.getAssets({ type: assetType });
+          if (allAssetsOfType.length === 0) {
+            console.error(`[BOOKING] CRITICAL: No assets of type "${assetType}" exist in the database!`);
+            return res.status(409).json({ message: `Configuration Error: No "${assetType}" equipment found in system. Please contact admin.` });
+          }
+          
           return res.status(409).json({ message: "No assets available for the selected time slot (including buffer periods)." });
         }
         targetAssetId = availableAsset.id;
