@@ -1,0 +1,158 @@
+You are a senior full-stack engineer. Fix a critical production bug in my Adam’s Club app.
+
+Symptoms (must reproduce + confirm fix)
+
+On the booking page (adventure gear booking), clicking Confirm Booking shows a toast: “Booking failed”.
+
+After this error, the server crashes / stops, and the workflow becomes unusable.
+
+Credits still deduct in the background even though the booking is not created (or booking is canceled / fails).
+
+Dev overlay previously shows:
+Configuration Error: No "kayak" equipment found in system. Please contact admin.
+and points to client client/src/pages/Bookings.tsx around a line that throws using errorData.message.
+
+Root requirement
+
+Booking creation must be atomic:
+
+Either booking is created AND credits are deducted
+
+Or nothing changes (no credit deduction) if booking fails for ANY reason (missing equipment, validation error, DB error, etc.)
+
+Your tasks (do in this exact order)
+A) Stop the crash (server must never die)
+
+Find the API endpoint the booking page calls (likely POST /api/bookings or similar).
+
+Ensure the booking handler is fully wrapped in try/catch and ALWAYS returns a JSON response.
+
+Add a global server error middleware/handler so unhandled errors return { message, code, details } with HTTP status, not a crash.
+
+Add process-level logging for unhandledRejection and uncaughtException so the server won’t silently stop in Replit.
+
+Verify: triggering the same failure no longer kills the server.
+
+B) Fix the “credits deducted even when booking fails” bug (atomicity)
+
+Trace exact booking workflow on the server:
+
+Where credits are deducted (function/service/model update)
+
+Where booking record is created
+
+Where equipment is validated/loaded (kayak lookup)
+
+Identify why credits update commits but booking fails after (likely ordering issue or missing transaction).
+
+Implement atomic operation using the DB’s transaction mechanism:
+
+If using SQL (Postgres/MySQL/SQLite via Prisma/Drizzle/Knex): use a transaction and ensure BOTH updates occur inside it.
+
+If using Mongo: use session transactions if supported; otherwise implement compensating rollback logic carefully.
+
+Correct ordering inside the transaction:
+
+Validate equipment exists first (or lock/read required rows)
+
+Validate user has sufficient credits
+
+Create booking
+
+Deduct credits
+
+Commit
+
+On ANY error: rollback (no booking, no credit change)
+
+Add an idempotency guard:
+
+Prevent double-deduct if the user retries due to network/UI failure.
+
+Use an idempotency key or unique constraint (e.g., userId + timeSlot + equipmentId), or store a bookingAttemptId.
+
+Add a “dry run” check endpoint or at least server-side validation so UI never sends invalid equipment.
+
+C) Fix equipment lookup (“kayak not found”)
+
+Find how the client sends equipment selection (name/slug/id).
+
+Fix to use a stable identifier:
+
+Prefer equipmentId
+
+If only slug/name exists, normalize: trim().toLowerCase() and store a canonical slug field.
+
+Ensure there is at least one kayak entry if the system expects it:
+
+If equipment is required seed data, add a safe seed/init step that inserts defaults (no duplicates).
+
+If equipment is admin-managed, update UI to only show equipment coming from the DB (no hardcoded “kayak”).
+
+Return a clear 404 JSON if equipment missing; do NOT throw an uncaught error.
+
+D) Fix client error handling (no hard crash on error)
+
+In client/src/pages/Bookings.tsx, ensure failed responses don’t cause runtime overlay crash.
+
+Client must:
+
+Read JSON safely (handle non-JSON responses)
+
+Show toast with server message
+
+Keep app usable
+
+Logging & reproduction instructions (must provide)
+
+Add temporary structured logs for:
+
+booking request payload
+
+equipment lookup key/id
+
+credit balance before/after
+
+transaction begin/commit/rollback
+
+Provide a “Steps to verify” checklist with expected results:
+
+Attempt booking with invalid equipment -> returns 404 JSON, NO credit change, server stays up
+
+Attempt booking with valid equipment -> 201 success, booking created, credits deducted once
+
+Retry same request -> no double-deduct; either same booking returned or a clear 409 conflict
+
+Deliverables
+
+Explain the root cause of:
+
+server crash
+
+credits deducting without booking
+
+kayak equipment mismatch
+
+List every file changed and why.
+
+Include the final code changes.
+
+Hard constraints
+
+Do NOT implement “quick hacks” like “deduct later” without atomic safety.
+
+Do NOT leave any path where credits can change unless booking is guaranteed created.
+
+All failures must respond with JSON and not crash the server.
+
+Start by searching for:
+
+POST route for bookings
+
+credit deduction logic
+
+equipment lookup logic
+
+the client fetch call in Bookings.tsx
+
+Then implement the fixes.
