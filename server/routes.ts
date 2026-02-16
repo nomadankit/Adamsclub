@@ -1438,8 +1438,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!targetAssetId) {
         // Find an available asset of the requested type/benefit
         // Map benefitId/type to asset type
-        const assetType = type || 'gear'; // default to gear
+        let assetType = type || 'gear'; // default to gear
         
+        // Fix: map 'camping' to 'camping' if it comes from the frontend
+        if (assetType.toLowerCase() === 'camping') {
+          assetType = 'camping';
+        }
+
         console.log(`[BOOKING] Looking for available asset of type: ${assetType} for range ${startDate} to ${endDate}`);
 
         const availableAsset = await storage.findAvailableAsset(assetType, startDate, endDate);
