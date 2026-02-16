@@ -377,7 +377,15 @@ export default function Bookings() {
     setShowQRModal(true)
   }
 
-  const getStatusBadge = (status: BookingStatus) => {
+  const getStatusBadge = (status: BookingStatus, isExpired: boolean = false) => {
+    if (isExpired) {
+      return (
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 flex items-center space-x-1">
+          <Hourglass className="h-3 w-3" />
+          <span>Expired</span>
+        </Badge>
+      )
+    }
     const configs: Record<string, { label: string; className: string; icon: any }> = {
       pending: { label: 'Upcoming', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: Hourglass },
       active: { label: 'Active', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle },
@@ -553,7 +561,10 @@ export default function Bookings() {
                   const displayBookings = status === 'pending'
                     ? filteredBookings
                     : status === 'cancelled'
-                      ? [...filteredBookings, ...expiredBookings.map(b => ({ ...b, notes: 'Expired (Time passed)' }))]
+                      ? [
+                          ...filteredBookings, 
+                          ...expiredBookings.map(b => ({ ...b, isExpired: true, notes: 'Expired (Time passed)' }))
+                        ]
                       : filteredBookings;
 
                   return (
@@ -590,7 +601,7 @@ export default function Bookings() {
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-2 mb-1">
                                       <h3 className="font-semibold text-lg">{booking.benefitTitle}</h3>
-                                      {getStatusBadge(booking.status)}
+                                      {getStatusBadge(booking.status, (booking as any).isExpired)}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                       <div className="flex items-center space-x-1">
