@@ -1519,6 +1519,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Map asset type to booking type
         const typeMap: Record<string, string> = {
+          'kayak': 'kayak',
+          'camping': 'camping',
+          'bike': 'bike',
+          'hiking': 'hiking',
           'kayak-premium': 'kayak',
           'camping-kit': 'camping',
           'bike-rental': 'bike',
@@ -1535,7 +1539,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'hiking': 'Mountain'
         };
 
-        const bookingType = asset?.id ? (typeMap[asset.id] || 'kayak') : 'kayak';
+        const assetType = asset?.type || 'gear';
+        const bookingType = typeMap[assetType] || 'kayak';
         const icon = iconMap[bookingType] || 'Backpack';
 
         return {
