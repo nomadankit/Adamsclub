@@ -396,6 +396,16 @@ export default function Bookings() {
 
   const filteredBookings = mockBookings
     .filter(b => b.status === activeTab)
+    .filter(b => {
+      // For "Upcoming" (pending) tab, only show future bookings
+      if (activeTab === 'pending') {
+        const bookingDate = new Date(b.date);
+        const [hours, minutes] = b.time.split(':').map(Number);
+        bookingDate.setHours(hours, minutes, 0, 0);
+        return bookingDate > new Date();
+      }
+      return true;
+    })
     .filter(b => filterType === 'all' || b.type === filterType)
     .filter(b => searchQuery === '' ||
       b.benefitTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
