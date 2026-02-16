@@ -32,7 +32,16 @@ export default function PaymentSuccess() {
 
   useEffect(() => {
     const checkStatus = async () => {
-      const sessionId = new URLSearchParams(search).get('session_id')
+      const urlParams = new URLSearchParams(search);
+      const sessionId = urlParams.get('session_id')
+      const canceled = urlParams.get('canceled')
+
+      if (canceled === 'true') {
+        setPaymentStatus('canceled')
+        setLoading(false)
+        return
+      }
+
       if (!sessionId) {
         setPaymentStatus('unavailable')
         setLoading(false)
@@ -129,6 +138,8 @@ export default function PaymentSuccess() {
         return <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
       case 'pending':
         return <Clock className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+      case 'canceled':
+        return <XCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
       case 'failed':
       case 'error':
         return <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
@@ -150,6 +161,11 @@ export default function PaymentSuccess() {
           message: isSubscription
             ? `${subscriptionCredits} Adventure Credits have been added to your account for taking this subscription! Your ${planType} plan is now active.`
             : `${creditPurchaseAmount || 'Your'} Adventure Credits have been added to your account.`
+        }
+      case 'canceled':
+        return {
+          title: 'Payment Canceled',
+          message: 'Your payment process was canceled. No charges were made to your account.'
         }
       case 'pending':
         return {
@@ -216,6 +232,11 @@ export default function PaymentSuccess() {
                 {paymentStatus === 'completed' && (
                   <Button onClick={handleGoToAccount} className="w-full">
                     View Account
+                  </Button>
+                )}
+                {paymentStatus === 'canceled' && (
+                  <Button onClick={() => setLocation('/credits')} className="w-full">
+                    Try Again
                   </Button>
                 )}
                 {paymentStatus === 'failed' && (

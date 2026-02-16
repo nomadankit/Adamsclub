@@ -90,6 +90,19 @@ function Router() {
     window.scrollTo(0, 0);
   }, [pathname]);
 
+  // Special case: Payment success should be accessible regardless of auth state
+  if (pathname === '/payment-success') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Header />
+        <main className="flex-1 overflow-y-auto pb-20">
+          <PaymentSuccess />
+        </main>
+        <BottomNavigation />
+      </div>
+    );
+  }
+
   // Show loading state only for initial load
   if (loading && user === undefined) {
     return (
