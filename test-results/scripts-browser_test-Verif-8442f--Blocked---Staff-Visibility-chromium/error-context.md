@@ -1,0 +1,238 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - banner:
+        - generic:
+          - generic:
+            - button:
+              - img
+            - generic:
+              - img
+              - generic: Adam's Club
+          - generic:
+            - generic:
+              - generic: Thursday, February 5th
+              - generic: 12:48 PM
+            - button:
+              - img
+              - generic: Toggle theme
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=2]: Profile
+            - button:
+              - img
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: TU
+                  - generic:
+                    - generic:
+                      - heading [level=1]: Test User 1
+                      - button:
+                        - img
+                      - generic: Member
+                    - paragraph: user1@test.com
+                    - paragraph: Member since Feb 2026
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                    - generic: "0"
+                    - generic: Bookings
+                  - generic:
+                    - generic:
+                      - img
+                    - generic: Free
+                    - generic: Plan
+                  - generic:
+                    - generic:
+                      - img
+                    - generic: "0.00"
+                    - generic: Credits
+          - generic:
+            - generic:
+              - heading [level=2]: Account
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - heading [level=3]: Settings
+                        - paragraph: Notifications & preferences
+                      - generic: →
+            - generic:
+              - heading [level=2]: Support
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                    - generic:
+                      - heading [level=3]: Help & FAQ
+                      - paragraph: Get answers to questions
+                    - generic: →
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - heading [level=3]: Sign Out
+                    - paragraph: Sign out of your account
+      - main:
+        - generic:
+          - main:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=1]: My Bookings
+                    - paragraph: Manage your gear reservations and experiences
+                  - button:
+                    - img
+                    - text: New Booking
+                - generic:
+                  - generic:
+                    - img
+                    - searchbox
+                  - combobox:
+                    - img
+                    - generic: All Types
+                    - img
+            - generic:
+              - generic:
+                - generic:
+                  - tablist:
+                    - tab [selected]: Upcoming
+                    - tab: Active
+                    - tab: Completed
+                    - tab: Cancelled
+                  - tabpanel:
+                    - generic:
+                      - generic:
+                        - img
+                        - paragraph: No upcoming bookings
+                        - paragraph: Book your next adventure to get started
+          - navigation:
+            - generic:
+              - button:
+                - img
+                - generic: Home
+              - button:
+                - img
+                - generic: Bookings
+              - button:
+                - img
+                - generic: Accounts
+      - navigation:
+        - generic:
+          - button:
+            - img
+            - generic: Home
+          - button:
+            - img
+            - generic: Bookings
+          - button:
+            - img
+            - generic: Accounts
+    - list
+  - dialog "Book Your Adventure" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Book Your Adventure" [level=2] [ref=e4]:
+        - img [ref=e5]
+        - generic [ref=e7]: Book Your Adventure
+      - paragraph [ref=e8]: Select your preferred date, time, and location.
+    - generic [ref=e9]:
+      - generic [ref=e11]:
+        - generic [ref=e12]: 🌊
+        - generic [ref=e13]:
+          - heading "Premium Kayak" [level=3] [ref=e14]
+          - paragraph [ref=e15]: Single or tandem kayak rental
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: Date
+          - button "February 6th, 2026" [expanded] [ref=e19] [cursor=pointer]:
+            - img
+            - text: February 6th, 2026
+        - generic [ref=e20]:
+          - generic [ref=e21]: Start Time
+          - combobox [ref=e22] [cursor=pointer]:
+            - generic: Select start time
+            - img [ref=e23]
+        - generic [ref=e25]:
+          - generic [ref=e26]: End Time
+          - combobox [disabled] [ref=e27]:
+            - generic: Select start time first
+            - img [ref=e28]
+        - generic [ref=e30]:
+          - generic [ref=e31]: Location
+          - combobox [ref=e32] [cursor=pointer]:
+            - generic: Select location
+            - img [ref=e33]
+      - generic [ref=e35]:
+        - button "Back" [ref=e36] [cursor=pointer]
+        - button "Continue" [disabled]
+    - button "Close" [ref=e37] [cursor=pointer]:
+      - img [ref=e38]
+      - generic [ref=e41]: Close
+  - dialog [ref=e42]:
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - generic [ref=e47]: February 2026
+        - generic [ref=e48]:
+          - button "Go to previous month" [ref=e49] [cursor=pointer]:
+            - img
+          - button "Go to next month" [ref=e50] [cursor=pointer]:
+            - img
+      - grid "February 2026" [ref=e51]:
+        - rowgroup [ref=e52]:
+          - row "Sunday Monday Tuesday Wednesday Thursday Friday Saturday" [ref=e53]:
+            - columnheader "Sunday" [ref=e54]: Su
+            - columnheader "Monday" [ref=e55]: Mo
+            - columnheader "Tuesday" [ref=e56]: Tu
+            - columnheader "Wednesday" [ref=e57]: We
+            - columnheader "Thursday" [ref=e58]: Th
+            - columnheader "Friday" [ref=e59]: Fr
+            - columnheader "Saturday" [ref=e60]: Sa
+        - rowgroup [ref=e61]:
+          - row "1 2 3 4 5 6 7" [ref=e62]:
+            - gridcell "1" [disabled]
+            - gridcell "2" [disabled]
+            - gridcell "3" [disabled]
+            - gridcell "4" [disabled]
+            - gridcell "5" [ref=e63] [cursor=pointer]
+            - gridcell "6" [active] [selected] [ref=e64] [cursor=pointer]
+            - gridcell "7" [ref=e65] [cursor=pointer]
+          - row "8 9 10 11 12 13 14" [ref=e66]:
+            - gridcell "8" [ref=e67] [cursor=pointer]
+            - gridcell "9" [ref=e68] [cursor=pointer]
+            - gridcell "10" [ref=e69] [cursor=pointer]
+            - gridcell "11" [ref=e70] [cursor=pointer]
+            - gridcell "12" [ref=e71] [cursor=pointer]
+            - gridcell "13" [ref=e72] [cursor=pointer]
+            - gridcell "14" [ref=e73] [cursor=pointer]
+          - row "15 16 17 18 19 20 21" [ref=e74]:
+            - gridcell "15" [ref=e75] [cursor=pointer]
+            - gridcell "16" [ref=e76] [cursor=pointer]
+            - gridcell "17" [ref=e77] [cursor=pointer]
+            - gridcell "18" [ref=e78] [cursor=pointer]
+            - gridcell "19" [ref=e79] [cursor=pointer]
+            - gridcell "20" [ref=e80] [cursor=pointer]
+            - gridcell "21" [ref=e81] [cursor=pointer]
+          - row "22 23 24 25 26 27 28" [ref=e82]:
+            - gridcell "22" [ref=e83] [cursor=pointer]
+            - gridcell "23" [ref=e84] [cursor=pointer]
+            - gridcell "24" [ref=e85] [cursor=pointer]
+            - gridcell "25" [ref=e86] [cursor=pointer]
+            - gridcell "26" [ref=e87] [cursor=pointer]
+            - gridcell "27" [ref=e88] [cursor=pointer]
+            - gridcell "28" [ref=e89] [cursor=pointer]
+```

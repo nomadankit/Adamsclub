@@ -1,0 +1,289 @@
+📱 Master Modular Prompt for Replit AI — Adam’s Club Mobile App
+You are my senior mobile engineer + no-code app builder inside Replit.
+ Your task is to help build a mobile-first application for Adam’s Club, using strict modular coding principles.
+ The application must be production-ready for App Store (iOS) and Google Play (Android).
+
+🏔️ Business Project Introduction
+Adam’s Club is a subscription-based lifestyle and experience-sharing platform.
+ It is built around the idea of access over ownership — members pay a monthly fee to enjoy premium outdoor gear (such as jet skis, mountain bikes, kayaks, camping kits) and curated experiences without needing to buy or maintain them.
+Vision: To make adventurous weekends and outdoor lifestyles accessible, affordable, and hassle-free for everyone.
+
+
+Value Proposition: Instead of spending thousands on equipment that requires storage, upkeep, and insurance, members simply book what they need when they need it, with insurance, deposits, and waivers managed seamlessly through the app.
+
+
+Target Users:
+
+
+Members (subscribers): Join, explore gear/experiences, book, check in/out, and manage billing in-app.
+
+
+Staff/Admins: Manage bookings, scan QR codes, capture/refund deposits, oversee waivers, and keep track of damages or delays.
+
+
+Partners (future): Experience vendors who can list their offerings directly.
+
+
+The mobile app must also have growth-focused features like smart popups, lead capture, referral nudges, and email/push notifications — helping to convert free users into paid members and retaining them long term.
+The guiding philosophy is simplicity, modularity, and reusability:
+ Every part of the system should be a self-contained piece (auth, bookings, payments, waivers, analytics, marketing), so we can replace or improve one feature without breaking others.
+
+🔑 Modular Coding Rules (apply everywhere)
+Single Responsibility: Each module should do only one job (auth handles login, booking handles reservations, waiver handles legal compliance, etc.).
+
+
+Interfaces First: Define TypeScript + Zod types and contracts before writing logic.
+
+
+Separation of Concerns:
+
+
+UI → /components (presentational only, no IO).
+
+
+Feature Logic → /features/<name> (hooks, orchestration).
+
+
+Business Logic → /services (pure functions, no React, no SDKs).
+
+
+External IO → /integrations (Stripe, Supabase, Email, Push, Storage).
+
+
+Shared Contracts → /schemas.
+
+
+State → /stores (React Query/Zustand/MMKV).
+
+
+Barrel Exports: Each module has index.ts exposing only its safe, public API.
+
+
+Tests: Each module must include happy path + failure case tests (mocking IO).
+
+
+Guardrails: Build in small, reviewable steps. Never mass-edit or overwrite. Always summarize what changed and how to test it.
+
+
+Feature Flags: All marketing/experimental features must live behind /config/flags.ts.
+
+
+
+📂 Folder Structure (Step 0 deliverable)
+/app        # Navigation & routes only (thin glue)
+/components # UI widgets: cards, forms, lists, modals, banners
+/features   # Each feature = self-contained module (auth, booking, payments, waiver, marketing, etc.)
+/services   # Pure business logic functions (deterministic, reusable)
+/integrations # Stripe, Auth, DB, Email, Push, NFC, Storage clients
+/stores     # State/query cache (React Query, Zustand, MMKV)
+/schemas    # Zod/TS entity types, enums, DTOs
+/lib        # Utilities (dates, money, QR, guards, ICS)
+/emails     # Email templates (server-triggered)
+/config     # Env parsing, flags, plans, marketing copy
+/tests      # Unit & integration tests (per module)
+/assets     # Icons, splash screens, fonts
+
+
+🛠️ Modular Tasks (each described with purpose + output)
+1) Master Kickoff (Scaffold & Guardrails)
+📌 Purpose: Create the foundation so everything else plugs in cleanly.
+Set up folders above.
+
+
+Add placeholder navigation:
+
+
+Tabs: Home, Explore, Bookings, Wallet, Profile.
+
+
+Hidden stacks: Auth, Checkout, Staff Mode, Settings, Legal/Waiver.
+
+
+Create README.md → explains modular philosophy & architecture.
+
+
+Create /config/flags.ts → toggles (marketingPopups, promoBar, referralNudge, etc.).
+
+
+Create /config/plans.ts → Base, Premium, VIP, Employee plans.
+
+
+Create /config/env.ts → typed env reader + .env.example.
+ ✅ Output: File tree + docs. Stop & wait for confirmation.
+
+
+
+2) Data Model & Reservations Integrity
+📌 Purpose: Define contracts & prevent double-bookings.
+Entities: UserProfile, Membership, Asset, AssetImage, AvailabilityBlock, Waiver, UserWaiver, Booking, Payment, AuditEvent.
+
+
+/lib/scheduling.ts → overlap checker (no double-bookings, enforces capacity & maintenance holds).
+
+
+/integrations/db/adapter.ts → repo interfaces (IBookingRepo, IAssetRepo, etc.) with withTransaction.
+
+
+Document RLS (row-level security) → members see own, staff/admin see all.
+ ✅ Output: Schemas, overlap function tests, DB interfaces.
+
+
+
+3) Auth & Roles
+📌 Purpose: Allow secure sign-in and gate staff/admin features.
+/integrations/auth/client.ts → signInEmailOtp, signInGoogle/Apple, signOut, getSession.
+
+
+/features/auth/useAuth.ts → manages session, role.
+
+
+Guards: RequireAuth, RequireRole.
+
+
+Screen: Sign In (OTP + Google/Apple), Profile (edit name + marketing opt-in).
+ ✅ Output: Working login flow + role gates.
+
+
+
+4) Memberships & Stripe Subscriptions
+📌 Purpose: Enable paid access & recurring billing.
+Stripe SDK → start subscription, handle webhooks (sub updated, invoice paid/failed).
+
+
+/features/membership → ensureActiveMembership, getMembershipStatus.
+
+
+Screens: Wallet (plan, next bill, card on file, charges), Pricing cards (plans + CTA).
+ ✅ Output: User can subscribe; Wallet shows active status.
+
+
+
+5) Inventory, Availability & Explore UX
+📌 Purpose: Show members what’s available & when.
+Admin CRUD: assets, images, deposits, tags, maintenance holds, availability blocks.
+
+
+Explore: Tabs Gear/Experiences, filters, list cards, availability teasers.
+
+
+Item Detail: gallery, description, calendar, Reserve CTA, cancel policy.
+ ✅ Output: Members browse & filter; availability enforced.
+
+
+
+6) Checkout, Waiver & Deposits
+📌 Purpose: Safe reservations with deposits + legal compliance.
+Waiver: versioned text, required acceptance, record timestamp/IP.
+
+
+Deposits: Stripe manual-capture → hold, capture, refund.
+
+
+Booking pipeline: membership check → waiver → overlap → booking created → QR shown.
+
+
+Confirmation email w/ ICS calendar link.
+ ✅ Output: Successful booking flow with deposit + waiver.
+
+
+
+7) QR Check-in/Out & Staff Scanner
+📌 Purpose: Real-world pickup & return flow.
+Generate QR per booking.
+
+
+Staff Mode: Scan → mark Checked Out; return → capture/refund deposit, log damages.
+
+
+Audit trail for every action.
+ ✅ Output: End-to-end booking lifecycle managed by staff.
+
+
+
+8) Staff Mode & Reports
+📌 Purpose: Give staff visibility & control on mobile.
+Staff Dashboard: KPIs (active members, check-ins today, utilization %, MTD revenue).
+
+
+Manage members, bookings, payments, settings.
+ ✅ Output: Staff can run daily ops inside app.
+
+
+
+9) In-App Marketing (Feature Flagged)
+📌 Purpose: Drive conversion & retention.
+Smart Popups (join CTAs).
+
+
+Promo Bar (rotating offers).
+
+
+Lead Capture (on checkout abandon).
+
+
+Referral Nudge (post-booking).
+ ✅ Output: Growth tools visible only when toggled on.
+
+
+
+10) Email Automations
+📌 Purpose: Educate, confirm, retain.
+Welcome series, confirmations, reminders, overdue alerts, dunning, winback.
+
+
+Triggers map domain events → emails.
+ ✅ Output: Event-driven emails ready with editable templates.
+
+
+
+11) Analytics & Metrics
+📌 Purpose: Understand funnel, usage, and risks.
+Events: app_open, view_pricing, checkout_started/completed, booking_created/returned.
+
+
+Dashboards: activation funnel, utilization, returns %, damage rate.
+ ✅ Output: Admin can see conversion & usage.
+
+
+
+12) Deep Links & App Routing
+📌 Purpose: Smooth handoffs between email/web & app.
+Deep link: adamsclub://booking/123 → opens booking.
+
+
+Universal links: https://app.adamsclub.com/* verified.
+ ✅ Output: Booking links open correctly in app.
+
+
+
+13) Seed Data & Demo Mode
+📌 Purpose: Quick stakeholder demos.
+Seed 10 users, 10 assets, 20 bookings, waiver v1, plans.
+
+
+Guided tour for admin on first run.
+ ✅ Output: Demo-ready app in <5 minutes.
+
+
+
+14) QA, Performance & Store Readiness
+📌 Purpose: App Store & Play Store compliance.
+QA checklists for flows + edge cases.
+
+
+Performance: <2s load, optimized images.
+
+
+Store: icons, splash, screenshots, privacy manifests, permissions, compliance docs.
+ ✅ Output: EAS build ready for submission.
+
+
+
+🚦 Deliver Step 0 Now
+Scaffold project (folders, env, flags, navigation).
+
+
+Show file tree + README + modular plan.
+
+
+Stop and wait for confirmation.

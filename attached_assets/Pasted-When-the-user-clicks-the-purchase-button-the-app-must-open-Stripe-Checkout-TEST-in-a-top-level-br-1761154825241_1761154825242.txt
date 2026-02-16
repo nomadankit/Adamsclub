@@ -1,0 +1,220 @@
+When the user clicks the purchase button, the app must open Stripe Checkout (TEST) in a top-level browser tab and redirect to the hosted Stripe page. Fix only what’s required. Keep existing app structure.
+
+Constraints
+
+Do not leak or print secret values.
+
+Do not remove unrelated code or features.
+
+Prefer surgical edits with clear diffs.
+
+Work with the existing stack (vanilla HTML/JS, Vite/React, Next.js, or Express/Node mixed).
+
+Environment (expected in Replit Secrets)
+
+STRIPE_SECRET_KEY = sk_test_...
+
+STRIPE_PRICE_ID = price_... (TEST price)
+
+PUBLISHABLE_KEY = pk_test_...
+
+Optional: PUBLIC_URL = full https URL of the app (e.g., https://<repl>.repl.co)
+
+If the stack is Vite/React, mirror PUBLISHABLE_KEY to VITE_PUBLISHABLE_KEY.
+If Next.js, mirror to NEXT_PUBLIC_PUBLISHABLE_KEY.
+If CRA, mirror to REACT_APP_PUBLISHABLE_KEY.
+
+Tasks (do exactly in order)
+
+Detect stack & install deps
+
+Read package.json.
+
+Ensure server has: express, stripe, cors, dotenv (keep versions compatible).
+
+If client uses Stripe on the browser, ensure @stripe/stripe-js is installed.
+
+Server route: /create-checkout-session
+
+If no server file, create index.js (ESM) or use existing server entry.
+
+Ensure:
+
+app.use(express.json())
+
+app.use(cors()) (restrict origin if you can detect the current app origin)
+
+Add/patch route:
+
+import express from "express";
+import Stripe from "stripe";
+import cors from "cors";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
+
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const priceId = req.body?.priceId || process.env.STRIPE_PRICE_ID;
+    if (!priceId) throw new Error("Missing STRIPE_PRICE_ID or body.priceId");
+    const origin =
+      process.env.PUBLIC_URL ||
+      req.headers.origin ||
+      `https://${req.headers.host}`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/cancel`,
+    });
+
+    return res.status(200).json({ id: session.id });
+  } catch (err) {
+    console.error("Stripe session error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/success", (_req, res) => res.send("✅ Payment success"));
+app.get("/cancel", (_req, res) => res.send("❌ Payment canceled"));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+
+Ensure a "start" script exists in package.json to run the server.
+
+Client wiring
+
+MUST ensure Stripe.js can load and publishable key is present at runtime.
+
+If vanilla HTML/JS:
+
+Confirm <script src="https://js.stripe.com/v3"></script> is loaded before calling Stripe(...).
+
+Wire a click handler that:
+
+// window.PUBLISHABLE_KEY should be set from env exposure if possible
+const pk =
+  window.PUBLISHABLE_KEY ||
+  (typeof import !== "undefined" && import.meta?.env?.VITE_PUBLISHABLE_KEY) ||
+  (typeof process !== "undefined" && process?.env?.NEXT_PUBLIC_PUBLISHABLE_KEY) ||
+  (typeof process !== "undefined" && process?.env?.REACT_APP_PUBLISHABLE_KEY);
+
+async function onBuy() {
+  if (!pk) { alert("Publishable key not found."); return; }
+  const stripe = window.Stripe ? Stripe(pk) : null;
+  if (!stripe) { alert("Stripe.js failed to load."); return; }
+
+  const res = await fetch("/create-checkout-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({})
+  });
+
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    alert("Session create failed: " + (e.error || `HTTP ${res.status}`));
+    return;
+  }
+
+  const { id } = await res.json();
+  const { error } = await stripe.redirectToCheckout({ sessionId: id });
+  if (error) alert(error.message);
+}
+
+
+If Vite/React:
+
+Ensure @stripe/stripe-js is used:
+
+import { loadStripe } from "@stripe/stripe-js";
+const stripe = await loadStripe(import.meta.env.VITE_PUBLISHABLE_KEY);
+
+
+Button handler mirrors the flow above.
+
+Confirm VITE_PUBLISHABLE_KEY is defined in Replit Secrets.
+
+If Next.js:
+
+Client: loadStripe(process.env.NEXT_PUBLIC_PUBLISHABLE_KEY).
+
+Keep session creation server-side only; do not expose sk_test_*.
+
+Top-level navigation requirement
+
+Ensure the app can run in a real tab. Provide a visible note or programmatic detect to avoid embedded iframe preview if it blocks top-level redirects.
+
+If an in-app CSP exists, ensure:
+
+script-src allows https://js.stripe.com
+
+connect-src allows https://api.stripe.com
+
+frame-src allows https://checkout.stripe.com
+
+Diagnostics
+
+On button click, log: “Creating checkout session…”.
+
+If /create-checkout-session returns non-200, log the status + body (do not log secrets).
+
+Add a visible error message in the UI on failure.
+
+Keep server logs concise and helpful.
+
+Acceptance tests (run now)
+
+Open app in new browser tab (not Replit embedded preview).
+
+DevTools Console:
+
+typeof Stripe → should be "function" (vanilla) or await loadStripe(...) resolves (bundlers).
+
+curl test (replace URL automatically):
+
+curl -s -X POST "$PUBLIC_URL/create-checkout-session" \
+  -H "Content-Type: application/json" -d '{}' 
+
+
+→ returns JSON with "id": "cs_test_..."
+
+Click Purchase → redirects to https://checkout.stripe.com/... (TEST).
+
+Test card: 4242 4242 4242 4242, future date, any CVC, any ZIP → lands on /success.
+
+Deliverables
+
+Output a concise summary of changes.
+
+Provide minimal diffs or full updated files for:
+
+server entry (or API route)
+
+client button handler
+
+any environment exposure tweaks
+
+Add a short README-STRIPE.md with:
+
+Required secrets (names only)
+
+How to run locally/on Replit
+
+How to switch products (STRIPE_PRICE_ID)
+
+Testing with Stripe test card
+
+Do not touch:
+
+Unrelated pages, styles, or business logic.
+
+Any code that is not necessary for Checkout redirect.
+
+Finish only when the button reliably opens Stripe Checkout in TEST mode and the success/cancel pages load after payment/cancel.

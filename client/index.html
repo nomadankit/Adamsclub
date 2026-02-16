@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <link rel="icon" href="./public_favicon.png" type="image/png" />
+    <title>Adam's Club - Premium Outdoor Gear Rental</title>
+    <meta name="description" content="Join Adam's Club and access premium outdoor gear like kayaks, camping equipment, and bikes. Monthly subscriptions starting at $29.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        const theme = localStorage.getItem('adams-club-theme') || 'dark';
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.add('light');
+        }
+      })();
+    </script>
+    <style>
+      /* Immediately apply dark mode to prevent flash of light mode */
+      html.dark {
+        --button-outline: rgba(255,255,255, .10);
+        --badge-outline: rgba(255,255,255, .05);
+        --opaque-button-border-intensity: 9;
+        --elevate-1: rgba(255,255,255, .04);
+        --elevate-2: rgba(255,255,255, .09);
+        --background: 240 10% 3%;
+        --foreground: 0 0% 98%;
+        --border: 240 11% 15%;
+        --card: 240 10% 8%;
+        --card-foreground: 0 0% 98%;
+        --card-border: 240 11% 18%;
+        --sidebar: 240 6% 10%;
+        --sidebar-foreground: 0 0% 98%;
+        --sidebar-border: 240 11% 20%;
+        --sidebar-primary: 142 69% 58%;
+        --sidebar-primary-foreground: 0 0% 9%;
+        --sidebar-accent: 240 6% 20%;
+        --sidebar-accent-foreground: 0 0% 90%;
+        --sidebar-ring: 142 69% 58%;
+        --popover: 240 10% 13%;
+        --popover-foreground: 0 0% 98%;
+        --popover-border: 240 11% 23%;
+        --primary: 142 69% 58%;
+        --primary-foreground: 0 0% 9%;
+        --secondary: 240 6% 25%;
+        --secondary-foreground: 0 0% 90%;
+        --muted: 240 6% 18%;
+        --muted-foreground: 0 0% 63%;
+        --accent: 240 4% 23%;
+        --accent-foreground: 0 0% 90%;
+        --destructive: 0 62% 50%;
+        --destructive-foreground: 0 0% 98%;
+        --input: 240 11% 25%;
+        --ring: 142 69% 58%;
+        --chart-1: 142 69% 70%;
+        --chart-2: 25 95% 53%;
+        --chart-3: 262 83% 68%;
+        --chart-4: 173 58% 59%;
+        --chart-5: 43 74% 59%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
+    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+  </body>
+</html>

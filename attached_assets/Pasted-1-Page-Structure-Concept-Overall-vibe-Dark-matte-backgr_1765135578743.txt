@@ -1,0 +1,128 @@
+1. Page Structure (Concept)
+Overall vibe:
+ Dark, matte background; subtle gradient accents (Lime/Green highlights); clean, minimal, bold typography. Focus on exclusivity + adventure.
+A. Hero – “Join the First Wave”
+Background: Matte-black base with a subtle diagonal green gradient overlay. Cinematic 16:9 scenic landscape of a calm mountain lake at sunset. Natural colors on the kayak, campfire, tent, and mountain. A single kayaker paddling on the lake in an orange kayak, silhouette style, reflections on the water. A campsite on the shore in the foreground with a green tent, a backpack, a small campfire glowing, grass and shoreline details. Massive snow-capped mountain in the distance, surrounded by dense pine forests on each side. Warm golden sunset light blending into the deep green sky. Soft fog layers, natural outdoor lighting, smooth minimal-grain illustration style, sharp details but subtle texture, serene and adventurous atmosphere. With a gradient fade away with next pages
+
+
+Main headline:
+ “Be First in Line for Adventure.”
+Join the Waitlist:
+ the button should be below the Main Headline and green coloured block with white text colour and when clicked redirect the user to the waitlist registering window with a scrolldown animation
+B. Section: “What Is Adam’s Club?”
+Short, punchy 3-column layout.
+Title: “Your Membership for Gear, Getaways & Good Deals.”
+
+
+Three pillars:
+
+
+Gear You Don’t Have to Own
+ “Access quality camping, adventure, and lifestyle gear without the full purchase cost.”
+
+
+Member-Only Offers & Credits
+ “Earn and spend Adam’s Credits on rentals, upgrades, and partner perks.”
+
+
+Curated Experiences
+ “From weekend camping to bucket-list trips, get first dibs on limited spots.”
+
+
+Each card has a simple line icon: backpack, coin, mountain.
+
+
+C. Section: “Why Join the Waitlist Now?”
+Two-column layout (text + benefits list).
+Title: “Early Adopters Get More.”
+
+
+Subtitle: “We’re rewarding the first wave of supporters.”
+
+
+Bulleted perks (examples):
+
+
+Locked founder pricing for Year 1.
+
+
+Priority access to new gear and categories.
+
+
+Early invitations to beta tests and trip pilots.
+
+
+Exclusive “Founding Member” badge on your profile.
+
+
+Higher earning rate of Adam’s Credits during launch period.
+
+
+Micro CTA: small button: “Reserve Your Spot →” (links back to the form at top or a second form in this section).
+
+
+
+D. Section: “How It Will Work”
+A simple 3-step row, numbered 1-2-3.
+Tell Us Where You Adventure
+ “Share your location and interests so we can prioritize launch cities and gear types.”
+
+
+Get Your Early Access Code
+ “As we open your region, you’ll receive an email with your access link and perks.”
+
+
+Unlock Gear & Perks
+ “Log in, browse gear and offers, book what you want, and start earning credits.”
+
+
+Tiny note: “We’ll roll out in phases, starting with the most active waitlist regions.”
+
+
+
+
+
+
+
+E. Join the Waitlist:
+
+
+Primary CTA form:
+
+
+Fields: First Name, Email, Country/Region (dropdown), checkbox for “I want early access to gear rentals, travel deals, and member-only perks.”
+
+
+Button: “Join the Waitlist”
+
+
+Trust note under button: “No spam. You can unsubscribe at any time.”
+
+
+Secondary info line:
+ “Founding members will receive priority invites, locked-in pricing, and surprise drops.”
+
+
+
+F. FAQ
+Short FAQ block (4–6 items), examples:
+“Does joining the waitlist cost anything?” → No, it’s free, no commitment.
+
+
+“Where will Adam’s Club launch first?” → Regions with the highest waitlist demand.
+
+
+“Is this for gear rental, travel, or both?” → Both: physical gear access + curated experiences & offers.
+
+
+“How will you contact me?” → Email only; no SMS unless you opt-in later.
+
+
+
+G. Footer
+Minimal: logo/wordmark, links: “Privacy Policy”, “Terms”, “Contact”.
+
+
+Tiny line: “© Adam’s Club, a Strategy Industries project.”
+
+

@@ -1,0 +1,82 @@
+Implement a production-ready Google OAuth Sign-In feature.
+
+Primary target stack: Node.js + Express. 
+If the repo is clearly Next.js, use next-auth. 
+If it’s Flask, use Authlib. Otherwise default to Node/Express.
+
+## Requirements
+- Add “Continue with Google” OAuth 2.0 login using scopes: openid email profile.
+- Persist user: googleId (sub), email, name, avatar, createdAt → SQLite.
+- On successful auth, issue an httpOnly JWT cookie (7d) with { uid, email }.
+- Routes:
+  - GET /auth/google → start OAuth
+  - GET /auth/google/callback → handle callback, upsert user, set cookie, redirect to /
+  - GET /api/me → return user profile if cookie valid; else 401
+  - POST /logout → clear cookie
+- Minimal UI at “/”: show “Continue with Google” when logged out; when logged in show name, avatar, and a Logout button.
+
+## Environment & Config
+- Create `.env.example`; load `.env`.
+- Required variables:
+  - GOOGLE_CLIENT_ID=
+  - GOOGLE_CLIENT_SECRET=
+  - BASE_URL= (e.g., http://localhost:3000 or https://<repl-subdomain>.repl.co)
+  - JWT_SECRET=
+- Create `docs/auth-setup.md` with steps:
+  1) Google Cloud Console → OAuth consent + OAuth 2.0 Client (Web).
+  2) Authorized redirect URI: ${BASE_URL}/auth/google/callback
+  3) Fill `.env` values and restart.
+
+## Node/Express Implementation (default)
+- Dependencies: express, openid-client, jsonwebtoken, cookie-parser, better-sqlite3, helmet
+- Files:
+  - src/server.js (Express app + static UI)
+  - src/auth/google.js (OpenID Client + routes)
+  - src/middleware/auth.js (JWT verify)
+  - src/ui/index.html (simple UI)
+  - db/init.js or inline schema creation
+  - docs/auth-setup.md
+- DB schema (better-sqlite3, file: data.sqlite):
+  - users(id INTEGER PK, googleId TEXT UNIQUE, email TEXT, name TEXT, avatar TEXT, createdAt TEXT)
+- Flow:
+  - `/auth/google`: Discover Google issuer, create client with redirect_uri = ${BASE_URL}/auth/google/callback, use PKCE + state, redirect to authorization URL.
+  - `/auth/google/callback`: Exchange code, verify ID token, extract sub/email/name/picture, upsert into users. Create JWT (7d). Set cookie `session` = JWT (httpOnly, sameSite=strict, secure=true when https). Redirect to `/`.
+  - `/api/me`: Verify cookie; return user row; 401 if invalid/missing.
+  - `/logout`: Clear cookie and return 204.
+- Security:
+  - helmet middleware.
+  - Enforce state + PKCE.
+  - Cookie: httpOnly, sameSite=strict; `secure: true` unless BASE_URL starts with http://localhost.
+- Scripts:
+  - "dev": nodemon src/server.js
+  - "start": node src/server.js
+  - "db:reset": drop + recreate users table
+
+## Next.js Fallback (if Next project detected)
+- Use next-auth (v5+) GoogleProvider.
+- JWT session strategy. Store id/email/name/image.
+- API route: `/api/auth/[...nextauth].ts`.
+- Page with `signIn("google")`/`signOut()` and profile fetch.
+- Document callback URL in docs/auth-setup.md.
+
+## Flask Fallback (if Python detected)
+- Use Authlib OAuth client with Google.
+- SQLite (sqlite3 or SQLAlchemy).
+- Blueprint `auth.py` with the same endpoints and JWT cookie via PyJWT.
+- Jinja2 template for minimal UI.
+
+## Acceptance Criteria
+- `/api/me` returns 200 with user when logged in; 401 when not.
+- After login, SQLite has one row per googleId; repeat logins update profile fields.
+- Cookie is httpOnly, sameSite=strict, and secure on https deployments.
+- `/logout` clears cookie; `/api/me` then 401.
+- `.env.example` and `docs/auth-setup.md` exist and are accurate.
+
+## Test Plan
+- Add basic tests:
+  - No cookie → `/api/me` = 401.
+  - Mock token exchange (unit) → set cookie → `/api/me` = 200 with expected fields.
+  - `/logout` → clears cookie → `/api/me` = 401.
+- Manual: complete Google flow using real credentials with correct BASE_URL and redirect URI.
+
+Proceed to implement now. If stack is ambiguous, implement the Node/Express version.

@@ -1,0 +1,41 @@
+1) Master kickoff prompt (create project & guardrails)
+Paste into Replit AI:
+Create a new project named adams-club-app and set up a web application per the brief below.
+ Do not overwrite or mass-edit files without asking. Work in small, reviewable changes. After each step, summarize what you did, what changed, and how I can preview it.
+Business summary: Adam’s Club is a subscription lifestyle club. Members pay monthly to access outdoor gear (jet skis, kayaks, bikes, camping kits) and curated experiences. Members can join, browse, reserve, check in/out, and see billing/wallet. Admins/Staff manage inventory, bookings, deposits/damages, members, and payouts. Partners (later) can list time-slot experiences.
+High-level requirements (no code yet—scaffold and plan):
+Public Landing with hero CTA “Join Adam’s Club”, pricing cards (Base, Premium, VIP, Employee), benefit bullets, testimonials, FAQ, footer links (Terms/Privacy/Waiver).
+
+
+Member App (after sign-in): Home, Explore (Gear/Experiences + filters), Item Detail, Checkout (membership check, waiver acceptance), Bookings (with QR), Wallet (membership, charges, deposits), Profile.
+
+
+Admin Dashboard: Dashboard KPIs, Members, Inventory (gear/experiences + availability & maintenance hold), Bookings (confirm/out/in/damaged/refund), Payments, Settings (plans/deposits/waiver/locations/staff roles).
+
+
+Must-haves: Auth (email OTP + Google if offered), Memberships & Billing (Stripe), Reservations (conflict-safe), QR check-in/out, Deposits (pre-auth/capture/refund), Digital Waiver (versioned), Admin tools, Audit log.
+
+
+Nice-to-add (stubbed): NFC check-in, credits/month, partner portal, reminders/ratings.
+
+
+Marketing inside site: smart join popups, promo bar, lead capture slide-over, referral nudge, email automations (welcome series, reminders, dunning), basic analytics.
+
+
+Target stack & hosting (use built-in templates if available; keep it standard & portable):
+Frontend: React (mobile-first) with Tailwind or equivalent; generate responsive components.
+
+
+Backend/data: Postgres-style DB (or Replit Database + Prisma-like schema if available). Use environment variables for secrets.
+
+
+Payments: Stripe for subscriptions, card-on-file, deposit holds/captures/refunds.
+
+
+Email: Simple provider (Resend or SMTP) with templates.
+
+
+Storage: image uploads for gear/experiences.
+
+
+Embedding: expose a clean /embed route for Wix iFrame with auto-height.

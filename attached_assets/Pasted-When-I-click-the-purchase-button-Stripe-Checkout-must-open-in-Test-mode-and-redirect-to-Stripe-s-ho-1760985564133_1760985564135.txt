@@ -1,0 +1,177 @@
+When I click the purchase button, Stripe Checkout must open in Test mode and redirect to Stripe’s hosted page. If anything is misconfigured, return a clear error in the console and server logs.
+
+Do this exactly:
+
+Detect stack & install deps
+
+Read package.json. If not already present, add:
+
+Server: express, stripe, cors, dotenv
+
+Client (if using bundler like Vite/React/Next): @stripe/stripe-js
+
+Keep versions compatible. Don’t remove existing libs.
+
+Environment & Secrets
+
+Expect these secrets from Replit’s Secrets panel (do NOT hardcode):
+
+STRIPE_SECRET_KEY = sk_test_...
+
+STRIPE_PRICE_ID = price_... (from Test mode)
+
+PUBLISHABLE_KEY = pk_test_...
+
+If a .env file exists, continue to use process.env.*. Do not print secret values in logs.
+
+Server route (create session)
+
+If there is no server, create index.js with an Express app; else edit existing server.
+
+Ensure:
+
+app.use(express.json())
+
+app.use(cors()) or a restrictive CORS config for the dev origins actually used.
+
+Implement /create-checkout-session:
+
+import express from "express";
+import Stripe from "stripe";
+import cors from "cors";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
+
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const priceId = req.body?.priceId || process.env.STRIPE_PRICE_ID;
+    if (!priceId) throw new Error("Missing STRIPE_PRICE_ID or body.priceId");
+    const origin = req.headers.origin || `https://${req.headers.host}`;
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/cancel`,
+    });
+    return res.status(200).json({ id: session.id });
+  } catch (err) {
+    console.error("Stripe session error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/success", (_req, res) => res.send("✅ Payment success"));
+app.get("/cancel", (_req, res) => res.send("❌ Payment canceled"));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+
+Ensure the server actually starts with the project (add a start script if missing).
+
+Client wiring (one of the following):
+
+A. Plain HTML page (quick path)
+
+If there’s a simple page, ensure it includes:
+
+<script src="https://js.stripe.com/v3"></script>
+<script>
+  const stripe = Stripe(window.PUBLISHABLE_KEY || "pk_test_placeholder");
+  async function buy() {
+    const res = await fetch("/create-checkout-session", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({}) });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error || `HTTP ${res.status}`); }
+    const { id } = await res.json();
+    const { error } = await stripe.redirectToCheckout({ sessionId: id });
+    if (error) alert(error.message);
+  }
+</script>
+<button onclick="buy()">Purchase</button>
+<script>
+  // Inject publishable key at runtime if possible
+  window.PUBLISHABLE_KEY = (typeof REPLIT_PUBLISHABLE_KEY !== "undefined") ? REPLIT_PUBLISHABLE_KEY : undefined;
+</script>
+
+
+Replace "pk_test_placeholder" by reading from a public config if available. Do not expose the secret key.
+
+B. Vite/React
+
+Use @stripe/stripe-js:
+
+import { loadStripe } from "@stripe/stripe-js";
+const stripe = await loadStripe(import.meta.env.VITE_PUBLISHABLE_KEY);
+const res = await fetch("/create-checkout-session", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({}) });
+const { id } = await res.json();
+await stripe.redirectToCheckout({ sessionId: id });
+
+
+Ensure VITE_PUBLISHABLE_KEY is set from Replit env and exposed at build time.
+
+C. Next.js
+
+Put server code in /api/create-checkout-session.ts (or .js) using the same logic above (server side only with sk_test_*).
+
+Client uses @stripe/stripe-js and fetches /api/create-checkout-session.
+
+Use NEXT_PUBLIC_PUBLISHABLE_KEY for client.
+
+Key correctness checks
+
+Client must use publishable pk_test_...
+
+Server must use secret sk_test_...
+
+STRIPE_PRICE_ID must be a test price_... that exists.
+
+If any value is missing/mismatched, print a clear console error and fail fast.
+
+CORS & paths
+
+If frontend runs on a different origin/port, set CORS origin to that exact origin and call the full URL in fetch.
+
+Confirm the route path used on the client matches the server (/create-checkout-session).
+
+Diagnostics to add
+
+Console: when the button is clicked, log “Creating checkout session…”.
+
+Network: log the exact response status and body if non-200.
+
+Server: log full error message (not secrets).
+
+Add a GET /health endpoint that returns { ok: true } so we can quickly confirm the server is reachable.
+
+Verification
+
+Run the project. Open the app’s webview.
+
+Click Purchase → You should be redirected to a Stripe Test Checkout page (URL contains checkout.stripe.com).
+
+If it fails, show me:
+
+Server console output
+
+Network tab details for the POST /create-checkout-session
+
+The exact error messages surfaced to the user
+
+Deliverables
+
+The minimal set of file edits (diff or full files) to make it work.
+
+A short README note in the repo root:
+
+Secrets to set (names only)
+
+How to run
+
+How to test with Stripe’s test card 4242 4242 4242 4242
+
+Where to change STRIPE_PRICE_ID for different products
+
+Do not remove unrelated app code. Fix only what’s needed for Stripe Checkout to open reliably.

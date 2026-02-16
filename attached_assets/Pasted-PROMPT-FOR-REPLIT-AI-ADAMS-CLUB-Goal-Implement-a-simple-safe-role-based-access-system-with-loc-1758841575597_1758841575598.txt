@@ -1,0 +1,104 @@
+PROMPT FOR REPLIT AI (ADAMS CLUB)
+Goal: Implement a simple, safe, role-based access system with location scopes so one shared app serves members, staff, location managers, and super admins. Everyone sees the same app; extra buttons/menus appear only when allowed. The server ALWAYS re-checks permissions.
+
+Guardrails (do these first)
+- Do NOT rename, reformat, or refactor unrelated code. Touch only what’s needed.
+- Add a feature flag `FEATURE_RBAC=true|false`; default it to false until tests pass.
+- Create DB migrations + a seed script. Back up DB before migrating.
+- Keep commits small and readable. Include a clear PR description.
+
+Core concepts (plain English)
+- Roles say “who you are” (super_admin, location_manager, staff, member).
+- Permissions say “what you can do” (e.g., perks.write, inventory.checkout).
+- Scopes say “where you can do it” (global or specific locations like A, B).
+- The UI shows buttons based on allowed actions; the server enforces them.
+
+Data model (minimal tables; add only if missing)
+- roles(id, name), permissions(id, name)
+- role_permissions(role_id, permission_id)
+- users(id, …), user_roles(user_id, role_id)
+- locations(id, code) and user_locations(user_id, location_id) for scoping
+- tiers(id, name), perks(id, name), tier_perks(tier_id, perk_id)
+- subscriptions(user_id, tier_id, status)
+- audit_log(id, user_id, action, target, meta_json, created_at)
+Migrations: create tables + indexes; no destructive changes to existing tables.
+
+Seed data (idempotent)
+- Roles: super_admin, location_manager, staff, member
+- Permissions:
+  - global: perks.read, perks.write, tiers.read, tiers.manage
+  - scoped: inventory.read, inventory.checkout, inventory.manage, members.read, members.manage
+- Role→Permission mapping:
+  - super_admin: all global + all scoped (implicit “global” scope)
+  - location_manager: inventory.read/manage, members.read/manage (scoped); inventory.checkout (scoped)
+  - staff: inventory.checkout (scoped), inventory.read (scoped)
+  - member: none (admin) — entitlements come from subscription tier
+- Create sample locations A and B for testing.
+
+Auth → Capabilities (what the app receives after login)
+- Add an endpoint `GET /me/capabilities` that returns the user’s effective abilities.
+- If you already issue JWTs, you may also include these as claims, but still provide the endpoint.
+Example response:
+{
+  "user_id": "u_demo",
+  "roles": ["location_manager"],
+  "permissions": [
+    {"name": "inventory.checkout", "scope": {"locations": ["A"]}},
+    {"name": "members.read",      "scope": {"locations": ["A"]}}
+  ],
+  "tier": "Pro",
+  "entitlements": ["perk_free_tuneup", "perk_2hr_kayak"]
+}
+
+Server enforcement (the real guard)
+- Add a small authorization helper: `requirePermission(permissionName, {locationId?})`.
+  - Checks that the user has the permission AND that the scope matches (either global OR includes the locationId).
+  - Return 403 with a clear message if not allowed.
+- Use this helper in any route that changes or reads protected data (perks write, inventory checkout, member edits, etc.).
+- Apply row-level filters in queries so users only see allowed locations by default.
+
+Frontend gating (just convenience; not security)
+- On app load, call `/me/capabilities`. Cache in memory; refresh on role change or re-login.
+- Show buttons/menus only if allowed. Examples:
+  - Show “Add/Remove Perk” only if the user has `perks.write` with global scope.
+  - Show inventory actions for a location only if the user has the matching scoped permission for that location.
+- Keep a single app. You may add convenience routes like `/admin` or `/location/A`, but permissions—not the URL—control access.
+
+Perks, tiers, and entitlements
+- Build (or use existing) CRUD for Perks (global; requires `perks.write`).
+- Build (or use existing) Tier management and Tier→Perk mapping (requires `tiers.manage`).
+- Member visible entitlements are derived from `subscriptions` + `tier_perks`. Compute on read; no heavy recompute needed.
+
+Audit logging
+- Log who did what, to which record, and when (user_id, action, target_id/type, meta_json). This is append-only.
+
+Acceptance tests (create these)
+1) Visibility:
+   - Member: no admin buttons.
+   - Staff(A): can checkout inventory at A, not B; can’t add perks.
+   - Manager(A): can manage members/inventory at A; can’t touch B; can’t add perks.
+   - Super Admin: can add/remove perks and manage tiers; sees all locations.
+2) Enforcement:
+   - Direct API calls without permission return 403.
+   - Row-level filtering prevents cross-location reads/writes.
+3) Capabilities:
+   - `/me/capabilities` returns expected roles/permissions/scopes for each test user.
+4) Feature flag:
+   - With `FEATURE_RBAC=false`, existing user flows keep working (no breaking changes).
+   - With `FEATURE_RBAC=true`, new checks and UI gating are active.
+
+Deliverables
+- DB migration(s) + seed script (idempotent).
+- `/me/capabilities` endpoint.
+- `requirePermission` helper + middleware wiring on protected routes.
+- Minimal UI updates to hide/show buttons based on capabilities (no redesign).
+- Test users: super_admin, manager_A, staff_A, member_basic, plus locations A/B.
+- Unit tests for the helper; integration tests for capabilities + protected routes.
+- PR with a concise README section: how to enable flag, run seeds, test, and rollback.
+
+Rollout plan
+- Run migrations and seeds in staging; set `FEATURE_RBAC=true` in staging; run tests; smoke test with all four test users.
+- Prod: migrate + seed; enable the flag for Super Admin accounts first; verify; enable for all.
+
+One-line description (for the app’s docs)
+“We use role-based access with location scopes. Everyone uses the same app, but your role controls which buttons you see and which locations you can act on. The server re-checks your permissions on every action.”
