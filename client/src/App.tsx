@@ -117,6 +117,7 @@ function Router() {
         <Route path="/signup" component={Signup} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/reset-password/:token" component={ResetPassword} />
+        <Route path="/payment-success" component={PaymentSuccess} />
         {/* Show LandingPage at root for marketing/welcome page */}
         <Route path="/" component={LandingPage} />
         <Route path="/home">
