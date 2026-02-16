@@ -31,7 +31,7 @@ args = "Start application"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start application (Fix)"
+args = "Start application (Single)"
 
 [[workflows.workflow]]
 name = "Start application"
@@ -43,7 +43,7 @@ args = "npm run dev"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "Start application (Fix)"
+name = "Start application (Single)"
 author = "agent"
 
 [[workflows.workflow.tasks]]
