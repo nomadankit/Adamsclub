@@ -195,6 +195,7 @@ export const bookings = sqliteTable("bookings", {
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeDepositIntentId: text("stripe_deposit_intent_id"),
   qrCode: text("qr_code").unique(),
+  qrToken: text("qr_token").unique(),
   checkedOutAt: integer("checked_out_at", { mode: "timestamp" }),
   checkedOutBy: text("checked_out_by").references(() => users.id),
   checkedInAt: integer("checked_in_at", { mode: "timestamp" }),

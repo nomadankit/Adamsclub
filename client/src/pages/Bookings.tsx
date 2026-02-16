@@ -368,8 +368,9 @@ export default function Bookings() {
 
   const handleViewQR = async (booking: Booking) => {
     setSelectedBooking(booking)
-    if (booking.qrCode) {
-      const qrUrl = await generateQRCode(booking.qrCode)
+    const token = (booking as any).qrToken || booking.qrCode
+    if (token) {
+      const qrUrl = await generateQRCode(token)
       setQrCodeUrl(qrUrl)
     }
     setShowQRModal(true)

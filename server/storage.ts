@@ -356,16 +356,23 @@ export class DatabaseStorage implements IStorage {
   async createBooking(bookingData: InsertBooking): Promise<Booking> {
     const endDate = new Date(bookingData.endDate);
     const bufferEnd = new Date(endDate.getTime() + 60 * 60 * 1000); // 1 hour buffer
+    const qrToken = `ACB-${crypto.randomUUID()}`;
 
     const [booking] = await db
       .insert(bookings)
       .values({
         ...bookingData,
         bufferEnd,
-        qrCode: `AC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate unique QR code
+        qrToken,
+        qrCode: qrToken, // Use same for backward compat if needed
       })
       .returning();
     return booking;
+  }
+
+  async getBookingByQRToken(qrToken: string): Promise<Booking | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.qrToken, qrToken));
+    return booking || undefined;
   }
 
   async getBookingsByUserId(userId: string): Promise<Booking[]> {
