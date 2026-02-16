@@ -436,10 +436,11 @@ export default function Bookings() {
 
   const getBookingCount = (status: BookingStatus) => {
     if (status === 'pending') {
-      return filteredBookings.length;
+      // Correctly count only the items actually shown in the filtered list
+      return filteredBookings.filter(b => b.status === 'pending').length;
     }
     if (status === 'cancelled') {
-      // Return the count of actual cancelled bookings plus the expired ones
+      // Count actual cancelled ones plus the expired ones
       const actualCancelled = mockBookings.filter(b => b.status === 'cancelled').length;
       return actualCancelled + expiredBookings.length;
     }
