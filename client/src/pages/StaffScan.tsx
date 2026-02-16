@@ -266,7 +266,7 @@ export default function StaffScan() {
                   <CardTitle className="text-base">Available Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-3">
-                  {(scanResult.booking.status === 'pending' || scanResult.booking.status === 'confirmed') && (
+                  {(scanResult.booking.status === 'pending') && (
                     <>
                       <Button
                         variant="default"
@@ -287,7 +287,7 @@ export default function StaffScan() {
                     </>
                   )}
 
-                  {scanResult.booking.status === 'checked_out' && (
+                  {scanResult.booking.status === 'active' && (
                     <Button
                       variant="default"
                       className="h-auto py-4 flex flex-col items-center gap-2 col-span-2"

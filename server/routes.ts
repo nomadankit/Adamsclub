@@ -422,13 +422,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.PENDING && booking.status !== 'confirmed') {
+      if (booking.status !== BookingStatus.PENDING) {
         return res.status(409).json({ message: `Cannot start adventure from state: ${booking.status}` });
       }
 
       await db.transaction(async (tx) => {
         await tx.update(bookings).set({ 
-          status: BookingStatus.CHECKED_OUT, 
+          status: BookingStatus.ACTIVE, 
           checkedOutAt: new Date(),
           checkedOutBy: req.user.id 
         }).where(eq(bookings.id, id));
@@ -453,13 +453,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.CHECKED_OUT) {
+      if (booking.status !== BookingStatus.ACTIVE) {
         return res.status(409).json({ message: "Booking is not active" });
       }
 
       await db.transaction(async (tx) => {
         await tx.update(bookings).set({ 
-          status: BookingStatus.CHECKED_IN, 
+          status: BookingStatus.COMPLETED, 
           checkedInAt: new Date(),
           checkedInBy: req.user.id 
         }).where(eq(bookings.id, id));
@@ -651,13 +651,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.PENDING && booking.status !== 'confirmed') {
+      if (booking.status !== BookingStatus.PENDING) {
         return res.status(409).json({ message: `Cannot start adventure from state: ${booking.status}` });
       }
 
       await db.transaction(async (tx) => {
         await tx.update(bookings).set({ 
-          status: BookingStatus.CHECKED_OUT, 
+          status: BookingStatus.ACTIVE, 
           checkedOutAt: new Date(),
           checkedOutBy: req.user.id 
         }).where(eq(bookings.id, id));
@@ -682,13 +682,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.CHECKED_OUT) {
+      if (booking.status !== BookingStatus.ACTIVE) {
         return res.status(409).json({ message: "Booking is not active" });
       }
 
       await db.transaction(async (tx) => {
         await tx.update(bookings).set({ 
-          status: BookingStatus.CHECKED_IN, 
+          status: BookingStatus.COMPLETED, 
           checkedInAt: new Date(),
           checkedInBy: req.user.id 
         }).where(eq(bookings.id, id));
@@ -726,18 +726,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Staff Dashboard Metrics
   app.get("/api/staff/dashboard/today", requireStaff, async (req: any, res) => {
     try {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const { date } = req.query;
+      const targetDate = date ? new Date(date as string) : new Date();
+      const startOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59);
 
       // Bookings scheduled for today
-      const todayBookings = await db.select({
-        id: bookings.id,
-        status: bookings.status,
-        startDate: bookings.startDate,
-        assetId: bookings.assetId,
-        userId: bookings.userId
-      }).from(bookings)
-        .where(gte(bookings.startDate, startOfToday));
+      const todayBookings = await db.select().from(bookings)
+        .where(and(
+          gte(bookings.startDate, startOfToday),
+          lte(bookings.startDate, endOfToday)
+        ));
 
       const bookingsWithDetails = await Promise.all(todayBookings.map(async (b) => {
         const asset = await storage.getAsset(b.assetId);
@@ -748,9 +747,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assetId: b.assetId,
           memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
           status: b.status,
-          startTime: b.startDate.toISOString()
+          startTime: b.startDate.toISOString(),
+          qrToken: b.qrToken
         };
       }));
+
+      // Active Checkouts (Status: active)
+      const activeCheckouts = await db.select({ count: count() })
+        .from(bookings)
+        .where(eq(bookings.status, BookingStatus.ACTIVE));
+
+      // Pending Returns (Status: active AND end_date < now)
+      const now = new Date();
+      const pendingReturns = await db.select({ count: count() })
+        .from(bookings)
+        .where(and(
+          eq(bookings.status, BookingStatus.ACTIVE),
+          lt(bookings.endDate, now)
+        ));
 
       // Inventory stats
       const allAssets = await storage.getAssets();
@@ -762,14 +776,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       res.json({
+        ok: true,
         bookings: bookingsWithDetails,
         inventory,
-        pendingCheckIns: todayBookings.filter(b => b.status === BookingStatus.CHECKED_OUT).length,
+        activeCheckouts: activeCheckouts[0]?.count || 0,
+        pendingReturns: pendingReturns[0]?.count || 0,
+        maintenanceItems: inventory.maintenance,
         totalToday: todayBookings.length
       });
     } catch (error) {
       console.error("Dashboard error:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard" });
+      res.status(500).json({ ok: false, message: "Failed to fetch dashboard" });
     }
   });
 
@@ -1140,13 +1157,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.PENDING && booking.status !== 'confirmed') {
+      if (booking.status !== BookingStatus.PENDING) {
         return res.status(409).json({ message: `Cannot start adventure from state: ${booking.status}` });
       }
 
       await db.transaction(async (tx) => {
         await tx.update(bookings).set({ 
-          status: BookingStatus.CHECKED_OUT, 
+          status: BookingStatus.ACTIVE, 
           checkedOutAt: new Date(),
           checkedOutBy: req.user.id 
         }).where(eq(bookings.id, id));
@@ -1171,13 +1188,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      if (booking.status !== BookingStatus.CHECKED_OUT) {
+      if (booking.status !== BookingStatus.ACTIVE) {
         return res.status(409).json({ message: "Booking is not active" });
       }
 
       await db.transaction(async (tx) => {
         await tx.update(bookings).set({ 
-          status: BookingStatus.CHECKED_IN, 
+          status: BookingStatus.COMPLETED, 
           checkedInAt: new Date(),
           checkedInBy: req.user.id 
         }).where(eq(bookings.id, id));
@@ -1215,18 +1232,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Staff Dashboard Metrics
   app.get("/api/staff/dashboard/today", requireStaff, async (req: any, res) => {
     try {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const { date } = req.query;
+      const targetDate = date ? new Date(date as string) : new Date();
+      const startOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59);
 
       // Bookings scheduled for today
-      const todayBookings = await db.select({
-        id: bookings.id,
-        status: bookings.status,
-        startDate: bookings.startDate,
-        assetId: bookings.assetId,
-        userId: bookings.userId
-      }).from(bookings)
-        .where(gte(bookings.startDate, startOfToday));
+      const todayBookings = await db.select().from(bookings)
+        .where(and(
+          gte(bookings.startDate, startOfToday),
+          lte(bookings.startDate, endOfToday)
+        ));
 
       const bookingsWithDetails = await Promise.all(todayBookings.map(async (b) => {
         const asset = await storage.getAsset(b.assetId);
@@ -1237,9 +1253,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assetId: b.assetId,
           memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
           status: b.status,
-          startTime: b.startDate.toISOString()
+          startTime: b.startDate.toISOString(),
+          qrToken: b.qrToken
         };
       }));
+
+      // Active Checkouts (Status: active)
+      const activeCheckouts = await db.select({ count: count() })
+        .from(bookings)
+        .where(eq(bookings.status, BookingStatus.ACTIVE));
+
+      // Pending Returns (Status: active AND end_date < now)
+      const now = new Date();
+      const pendingReturns = await db.select({ count: count() })
+        .from(bookings)
+        .where(and(
+          eq(bookings.status, BookingStatus.ACTIVE),
+          lt(bookings.endDate, now)
+        ));
 
       // Inventory stats
       const allAssets = await storage.getAssets();
@@ -1251,14 +1282,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       res.json({
+        ok: true,
         bookings: bookingsWithDetails,
         inventory,
-        pendingCheckIns: todayBookings.filter(b => b.status === BookingStatus.CHECKED_OUT).length,
+        activeCheckouts: activeCheckouts[0]?.count || 0,
+        pendingReturns: pendingReturns[0]?.count || 0,
+        maintenanceItems: inventory.maintenance,
         totalToday: todayBookings.length
       });
     } catch (error) {
       console.error("Dashboard error:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard" });
+      res.status(500).json({ ok: false, message: "Failed to fetch dashboard" });
     }
   });
 

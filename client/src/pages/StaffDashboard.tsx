@@ -59,8 +59,8 @@ export default function StaffDashboard() {
   }
 
   const todayBookings = dashboardData?.totalToday ?? 0
-  const activeCheckouts = dashboardData?.bookings?.filter(b => b.status === 'checked_out').length ?? 0
-  const pendingCheckIns = dashboardData?.pendingCheckIns ?? 0
+  const activeCheckouts = dashboardData?.activeCheckouts ?? 0
+  const pendingCheckIns = dashboardData?.pendingReturns ?? 0
   const inventoryTotal = dashboardData?.inventory?.total ?? 0
   const inventoryAvailable = dashboardData?.inventory?.available ?? 0
   const maintenanceItems = dashboardData?.inventory?.maintenance ?? 0

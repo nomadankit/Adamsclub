@@ -44,11 +44,9 @@ export const PerkType = {
 // Booking status enum
 export const BookingStatus = {
   PENDING: 'pending',
-  CONFIRMED: 'confirmed',
-  CHECKED_OUT: 'checked_out',
-  CHECKED_IN: 'checked_in',
-  CANCELLED: 'cancelled',
-  DAMAGED: 'damaged'
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled'
 } as const;
 
 // Asset types enum
