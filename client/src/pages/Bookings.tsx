@@ -418,7 +418,21 @@ export default function Bookings() {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     })
 
+  const expiredBookings = mockBookings.filter(b => {
+    if (b.status !== 'pending') return false;
+    const bookingDate = new Date(b.date);
+    const [hours, minutes] = b.time.split(':').map(Number);
+    bookingDate.setHours(hours, minutes, 0, 0);
+    return bookingDate <= new Date();
+  });
+
   const getBookingCount = (status: BookingStatus) => {
+    if (status === 'pending') {
+      return filteredBookings.length;
+    }
+    if (status === 'cancelled') {
+      return mockBookings.filter(b => b.status === 'cancelled').length + expiredBookings.length;
+    }
     return mockBookings.filter(b => b.status === status).length
   }
 
@@ -533,31 +547,36 @@ export default function Bookings() {
                   </TabsTrigger>
                 </TabsList>
 
-                {(['pending', 'active', 'completed', 'cancelled'] as BookingStatus[]).map(status => (
-                  <TabsContent key={status} value={status} className="space-y-4">
-                    {filteredBookings.length === 0 ? (
-                      <div className="text-center py-16">
-                        <div className="text-muted-foreground">
-                          <Package className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg mb-2">No {status} bookings</p>
-                          <p className="text-sm">
-                            {status === 'pending' && "Book your next adventure to get started"}
-                            {status === 'active' && "No gear currently checked out"}
-                            {status === 'completed' && "Your completed adventures will appear here"}
-                            {status === 'cancelled' && "No cancelled bookings"}
-                          </p>
+                {(['pending', 'active', 'completed', 'cancelled'] as BookingStatus[]).map(status => {
+                  const displayBookings = status === 'cancelled' 
+                    ? [...filteredBookings, ...expiredBookings.map(b => ({ ...b, notes: 'Expired (Time passed)' }))]
+                    : filteredBookings;
+
+                  return (
+                    <TabsContent key={status} value={status} className="space-y-4">
+                      {displayBookings.length === 0 ? (
+                        <div className="text-center py-16">
+                          <div className="text-muted-foreground">
+                            <Package className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                            <p className="text-lg mb-2">No {status} bookings</p>
+                            <p className="text-sm">
+                              {status === 'pending' && "Book your next adventure to get started"}
+                              {status === 'active' && "No gear currently checked out"}
+                              {status === 'completed' && "Your completed adventures will appear here"}
+                              {status === 'cancelled' && "No cancelled or expired bookings"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      filteredBookings.map(booking => (
-                        <Card
-                          key={booking.id}
-                          className="hover-card cursor-pointer transition-all duration-200"
-                          onClick={() => {
-                            setSelectedBooking(booking)
-                            setShowDetailsModal(true)
-                          }}
-                        >
+                      ) : (
+                        displayBookings.map(booking => (
+                          <Card
+                            key={booking.id}
+                            className="hover-card cursor-pointer transition-all duration-200"
+                            onClick={() => {
+                              setSelectedBooking(booking)
+                              setShowDetailsModal(true)
+                            }}
+                          >
                           <CardContent className="p-5">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center space-x-3 flex-1">
