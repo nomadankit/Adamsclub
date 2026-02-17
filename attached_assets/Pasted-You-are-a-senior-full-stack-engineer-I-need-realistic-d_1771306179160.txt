@@ -1,0 +1,150 @@
+You are a senior full-stack engineer. I need realistic demo data so I can test my Adam’s Club app end-to-end. Right now bookings fail because “bike equipment isn’t available / inventory unavailable”. Build a repeatable seeding system and populate the database with demo data that makes the whole workflow testable.
+
+Goals
+
+Members can successfully book gear (bike, kayak, camping).
+
+Staff dashboard metrics show non-zero data.
+
+Staff schedule shows upcoming bookings.
+
+Staff scan (QR) works: scan booking → Start Adventure → Return Gear.
+
+Admin/staff panels have inventory to manage.
+
+What to build
+A) A Seed Script (idempotent)
+
+Create a seed script runnable via one command (ex: npm run seed).
+
+It MUST be idempotent:
+
+Running it multiple times should not create duplicates.
+
+Use deterministic unique keys (email, equipment slug, asset barcode, etc.).
+
+Detect the project’s DB stack by inspecting package.json and existing DB client usage (Prisma/Drizzle/Knex/Mongoose/etc.) and implement the correct approach.
+
+B) Demo Entities to Create
+
+Create at minimum:
+
+1) Users
+
+1 Admin user: admin@adamsclub.test password Password123!
+
+2 Staff users:
+
+staff1@adamsclub.test password Password123!
+
+staff2@adamsclub.test password Password123!
+
+3 Member users:
+
+member1@adamsclub.test password Password123!
+
+member2@adamsclub.test password Password123!
+
+member3@adamsclub.test password Password123!
+Give roles correctly so each panel is accessible.
+
+2) Equipment Types (catalog)
+Create equipment entries with stable IDs + slug:
+
+Bike (slug: bike)
+
+Kayak (slug: kayak)
+
+Camping Kit (slug: camping)
+Include credit cost, duration rules if applicable.
+
+3) Inventory / Assets
+Create multiple physical assets per equipment:
+
+Bikes: 5 assets (barcodes like AC-BIKE-001..005)
+
+Kayaks: 3 assets (AC-KAYAK-001..003)
+
+Camping kits: 4 assets (AC-CAMP-001..004)
+Set statuses:
+
+Most as AVAILABLE
+
+At least 1 as MAINTENANCE
+
+At least 1 as CHECKED_OUT (if you track this)
+
+4) Member Credits
+Give each member enough credits (ex: 50–100) so bookings can be created without failing.
+
+5) Bookings
+Create demo bookings across statuses:
+
+For member1:
+
+1 UPCOMING booking for Bike later today/tomorrow
+
+1 ACTIVE booking for Kayak (started already)
+
+1 COMPLETED booking for Camping (returned)
+
+For member2:
+
+1 CANCELLED booking
+
+Ensure times are realistic and timezone-safe (store UTC).
+
+6) QR Tokens
+For every booking, create/store a qrToken or bookingCode so staff scan can resolve it.
+
+If QR encoding uses a prefix (e.g. ACB:<token>), generate that accordingly.
+
+C) Wire it to existing UI expectations
+
+Ensure the staff dashboard metrics endpoint counts these statuses correctly so the dashboard is not stuck at 0.
+
+Ensure staff schedule endpoint returns upcoming + active bookings properly.
+
+Ensure scan endpoint can resolve the QR token and return the booking details.
+
+Required verification steps (must provide)
+
+After seed, I should be able to:
+
+Login as member1 → see bookings in the correct tabs (Upcoming/Active/Completed/Cancelled).
+
+Create a new booking for Bike or Kayak successfully (inventory must exist).
+
+Login as staff1 → Staff Schedule shows upcoming bookings.
+
+Staff Dashboard shows non-zero metrics.
+
+Staff Scan:
+
+scan QR for an UPCOMING booking → see actions Start/Cancel
+
+Start → booking becomes ACTIVE, asset becomes CHECKED_OUT
+
+Return → booking becomes COMPLETED, asset becomes AVAILABLE
+
+No server crashes. All errors return JSON.
+
+Implementation constraints
+
+Do NOT hardcode fake data only in frontend; it must be real DB data.
+
+Seeding must be safe and repeatable.
+
+If migrations are missing, create the minimal schema updates needed (e.g. add equipment.slug, asset.status, booking.status, booking.qrToken, user.role).
+
+Make sure “bike equipment unavailable” cannot happen after seeding.
+
+Deliverables
+
+Add npm run seed (or equivalent) in package.json.
+
+Provide list of files changed.
+
+Print the demo credentials and what each user role can test.
+
+Start by inspecting the DB and current schema/models, then implement seed accordingly.
