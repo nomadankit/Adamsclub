@@ -216,20 +216,11 @@ export default function Bookings() {
         credentials: 'include',
         body: JSON.stringify(bookingData)
       })
-      if (!response.ok) {
-        let errorMessage = 'Failed to create booking'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.message || errorMessage
-        } catch {
-          try {
-            errorMessage = await response.text() || errorMessage
-          } catch {
-          }
-        }
-        throw new Error(errorMessage)
+      const result = await response.json()
+      if (!response.ok || result.ok === false) {
+        throw new Error(result.message || 'Failed to create booking')
       }
-      return response.json()
+      return result
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] })

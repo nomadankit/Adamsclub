@@ -1,0 +1,204 @@
+You are a senior full-stack engineer. Fix a critical bug in my Adam’s Club app where members cannot book gear, and ensure every booking is perfectly synchronized to the staff panel (same gear + same exact time).
+
+What’s happening (must reproduce)
+
+On /bookings, when a member confirms booking, it fails with:
+
+Runtime overlay + toast:
+No "camping" equipment available. Please contact admin or try a different time.
+
+Error thrown in:
+client/src/pages/Bookings.tsx around line ~230 (throw new Error(errorMessage))
+
+This suggests the backend returns an error message indicating no available inventory for the selected category/type (“camping”) at that requested time.
+
+Required outcome
+
+Members can book gear successfully when inventory exists.
+
+If inventory truly doesn’t exist, UI should show a friendly message (NO app crash) and offer alternatives.
+
+Every booking created must appear in staff panel (Schedule + Dashboard + Scan flow) with the exact same:
+
+gear type / equipment
+
+time window (start/end)
+
+booking status
+
+member identity (where appropriate)
+
+Member view and staff view must read from the same source of truth (same booking record).
+
+Diagnose + Fix (do in this exact order)
+1) Trace the end-to-end booking request
+
+Locate the member booking creation function in client/src/pages/Bookings.tsx (the fetch/mutation around line ~230).
+
+Print/log (DEV-only) the exact payload being sent:
+
+selected gear identifier (equipmentId / gearType / slug)
+
+start time, end time, duration
+
+timezone
+
+quantity
+
+Identify the server endpoint receiving it (POST /api/bookings or similar).
+
+On server, log received payload and computed “availability query”.
+
+2) Identify why backend says “No 'camping' equipment available”
+
+Check these likely root causes and fix the real one:
+
+A) Wrong mapping: user selects gear X but payload sends “camping”
+
+UI label/value mismatch (dropdown value is wrong).
+
+Default/fallback sets gear type to “camping”.
+Fix: always send stable equipmentId (preferred) and validate it server-side.
+
+B) Inventory/Equipment seed missing or incorrect
+
+There may be no equipment rows in DB for category “camping”.
+
+Or equipment exists but marked unavailable or wrong status.
+Fix:
+
+ensure equipment records exist (seed/init if needed)
+
+ensure inventory status is correct: AVAILABLE, MAINTENANCE, CHECKED_OUT, etc.
+
+C) Availability query is wrong (time overlap logic bug)
+
+Common bug: overlap query rejects all times due to inverted comparisons.
+Fix overlap logic for bookings:
+
+A new booking overlaps if:
+existing.start < requested.end AND existing.end > requested.start
+
+Exclude cancelled/completed bookings from blocking availability.
+
+Use correct timezone normalization.
+
+D) Timezone mismatch causing availability to be “zero”
+
+Member sends local time, server interprets UTC (or vice versa), shifting window.
+Fix:
+
+store times in UTC in DB
+
+accept timezone in request, convert consistently
+
+ensure staff schedule uses the same stored UTC and displays in the correct timezone.
+
+E) Asset-level vs equipment-level confusion
+
+You may be checking “asset barcode exists” when you should check “equipment category capacity”.
+Fix design:
+
+Booking should reference equipment type (or equipmentId) + optionally reserve a specific asset.
+
+If your model uses individual assets, choose an available asset at booking time OR at staff checkout time (but be consistent).
+
+3) Make booking creation atomic and consistent
+
+When booking is created:
+
+Create booking record with canonical status: PENDING (or UPCOMING)
+
+Reserve inventory properly (either reserve an asset or reserve capacity)
+
+Return booking response that includes:
+
+bookingId
+
+equipmentId + equipmentName/category
+
+startAt/endAt (ISO strings)
+
+status
+
+qrToken/bookingCode (for staff scan)
+All of this must succeed or fail together (transaction).
+
+4) Fix the client so it never “crashes” on booking error
+
+In Bookings.tsx:
+
+Do NOT throw unhandled errors that trigger Vite overlay.
+
+Handle non-200 responses safely:
+
+parse JSON if possible, fallback to text
+
+show toast error
+
+keep app usable
+
+Ensure UI shows correct, actionable message:
+
+“No availability for Camping at this time”
+
+suggest changing time or choosing another item (optional)
+
+5) Guarantee Member ↔ Staff Panel synchronization
+Single source of truth
+
+Staff Schedule must fetch bookings from the same bookings table/collection.
+
+Staff Dashboard metrics must be computed from same statuses.
+
+Exact matching requirements
+
+If member booked gear “Bike” from 10:00–13:00:
+
+staff schedule MUST show “Bike” 10:00–13:00 (same bookingId)
+
+Implement consistent fields:
+
+booking.equipmentId
+
+booking.startAtUtc
+
+booking.endAtUtc
+
+booking.status
+
+After booking creation
+
+Invalidate/refetch staff schedule and dashboard queries (if caching).
+
+Ensure no filtering mismatch:
+
+schedule shows upcoming bookings
+
+dashboard counts today’s bookings based on timezone-correct “today” window
+
+6) Add quick verification scripts/tests
+
+Add at least one minimal test or dev script to validate:
+
+booking a “camping” item succeeds when inventory exists
+
+staff schedule endpoint returns the booking with matching gear/time
+
+overlap logic correctly allows non-overlapping bookings and blocks overlapping ones
+
+Deliverables (must output)
+
+Root cause summary for “No 'camping' equipment available”
+
+Files changed list
+
+Final API contract for booking creation + staff schedule
+
+Steps to verify:
+
+create booking on member side
+
+immediately see it on staff schedule with exact gear/time
+
+dashboard counts update

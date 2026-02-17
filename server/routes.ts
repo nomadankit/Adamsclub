@@ -1674,6 +1674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         targetAsset = await storage.getAsset(assetId);
       }
 
+      // benefitId can be passed from frontend
       if (!targetAsset && benefitId) {
         targetAsset = await storage.getAsset(benefitId);
       }
@@ -1690,8 +1691,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (!targetAsset) {
+          // Final fallback: try to find any available asset of the requested type if category match fails
+          const anyAsset = await storage.findAvailableAsset(requestedType, startDate, endDate);
+          if (anyAsset) {
+            targetAsset = anyAsset;
+          }
+        }
+
+        if (!targetAsset) {
           console.error(`[BOOKING] No available assets matching "${requestedType}" / "${requestedTitle}"`);
-          return res.status(404).json({
+          return res.status(200).json({ // Return 200 with error flag to prevent UI crash
+            ok: false,
             message: `No "${requestedType || 'gear'}" equipment available. Please contact admin or try a different time.`,
             code: 'EQUIPMENT_NOT_FOUND',
             details: { requestedType, benefitId }

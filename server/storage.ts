@@ -421,8 +421,7 @@ export class DatabaseStorage implements IStorage {
       // Check for active/confirmed bookings only? usually pending also blocks
       or(
         eq(bookings.status, 'pending'),
-        eq(bookings.status, 'active'),
-        eq(bookings.status, 'completed')
+        eq(bookings.status, 'active')
       ),
       // Overlap logic: (StartA < EndB) and (EndA > StartB)
       // Here Range A = New Booking [startDate, newBufferEnd]
