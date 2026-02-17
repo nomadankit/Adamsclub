@@ -62,8 +62,28 @@ async function normalizeBookingStatuses() {
     const validStatuses = [BookingStatus.PENDING, BookingStatus.ACTIVE, BookingStatus.COMPLETED, BookingStatus.CANCELLED];
     const allBookings = await db.select().from(bookings);
     let fixed = 0;
+    const now = new Date();
 
     for (const booking of allBookings) {
+      // Auto-complete active bookings that have passed their end date
+      if (booking.status === BookingStatus.ACTIVE && booking.endDate < now) {
+        await db.transaction(async (tx) => {
+          await tx.update(bookings).set({ 
+            status: BookingStatus.COMPLETED,
+            checkedInAt: booking.endDate,
+            updatedAt: now
+          }).where(eq(bookings.id, booking.id));
+          
+          await tx.update(assets).set({ 
+            status: AssetStatus.AVAILABLE,
+            isAvailable: true,
+            updatedAt: now
+          }).where(eq(assets.id, booking.assetId));
+        });
+        fixed++;
+        continue;
+      }
+
       if (!validStatuses.includes(booking.status as any)) {
         let newStatus = BookingStatus.PENDING;
         if (booking.checkedInAt) {
