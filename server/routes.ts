@@ -65,13 +65,14 @@ async function normalizeBookingStatuses() {
     const now = new Date();
 
     for (const booking of allBookings) {
-      // Auto-complete active bookings that have passed their end date (plus 2 hour grace period)
-      const completionThreshold = new Date(booking.endDate.getTime() + 2 * 60 * 60 * 1000);
-      if (booking.status === BookingStatus.ACTIVE && completionThreshold < now) {
+      // Auto-complete active bookings that have passed their end date (plus 1 minute for "instant" testing/cleanup)
+      const bookingEndDate = new Date(booking.endDate);
+      if (booking.status === BookingStatus.ACTIVE && bookingEndDate < now) {
+        console.log(`[STARTUP] Auto-completing overdue booking: ${booking.id} (Scheduled End: ${booking.endDate})`);
         await db.transaction(async (tx) => {
           await tx.update(bookings).set({ 
             status: BookingStatus.COMPLETED,
-            checkedInAt: booking.endDate,
+            checkedInAt: bookingEndDate,
             updatedAt: now
           }).where(eq(bookings.id, booking.id));
           

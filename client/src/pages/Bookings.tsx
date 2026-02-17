@@ -393,7 +393,7 @@ export default function Bookings() {
     )
   }
 
-  const filteredBookings = mockBookings
+  const filteredBookings = (mockBookings || [])
     .filter(b => b.status === activeTab)
     .filter(b => {
       // For "Upcoming" (pending) tab, only show future bookings
