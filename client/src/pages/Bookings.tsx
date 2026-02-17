@@ -394,8 +394,13 @@ export default function Bookings() {
   }
 
   const filteredBookings = (mockBookings || [])
-    .filter(b => b.status === activeTab)
     .filter(b => {
+      // Robust status matching
+      const currentStatus = b.status?.toLowerCase();
+      const targetStatus = activeTab?.toLowerCase();
+      
+      if (currentStatus !== targetStatus) return false;
+
       // For "Upcoming" (pending) tab, only show future bookings
       if (activeTab === 'pending') {
         const bookingDate = new Date(b.date);
@@ -403,6 +408,17 @@ export default function Bookings() {
         bookingDate.setHours(hours, minutes, 0, 0);
         return bookingDate > new Date();
       }
+      
+      // For "Active" tab, double check if it should have been completed by now (frontend safety)
+      if (activeTab === 'active') {
+        const bookingDate = new Date(b.date);
+        const [hours, minutes] = b.time.split(':').map(Number);
+        // Assuming duration is in hours for this check
+        const durationHours = parseFloat(b.duration || '1');
+        bookingDate.setHours(hours + durationHours, minutes, 0, 0);
+        if (bookingDate < new Date()) return false;
+      }
+
       return true;
     })
     .filter(b => filterType === 'all' || b.type === filterType)

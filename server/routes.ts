@@ -65,8 +65,13 @@ async function normalizeBookingStatuses() {
     const now = new Date();
 
     for (const booking of allBookings) {
-      // Auto-complete active bookings that have passed their end date (plus 1 minute for "instant" testing/cleanup)
+      // Auto-complete active bookings that have passed their end date
       const bookingEndDate = new Date(booking.endDate);
+      const bookingStartDate = new Date(booking.startDate);
+      
+      // Safety: If status is 'active' but end date is in the past, complete it.
+      // Also if status is 'pending' but start date is way in the past (e.g. 24h), cancel or complete it?
+      // For now, let's focus on 'active' as requested.
       if (booking.status === BookingStatus.ACTIVE && bookingEndDate < now) {
         console.log(`[STARTUP] Auto-completing overdue booking: ${booking.id} (Scheduled End: ${booking.endDate})`);
         await db.transaction(async (tx) => {
@@ -84,6 +89,12 @@ async function normalizeBookingStatuses() {
         });
         fixed++;
         continue;
+      }
+
+      // Special case: If a booking was created manually with 'confirmed' status (as seen in some DB logs), normalize it to 'pending'
+      if (booking.status === 'confirmed') {
+        await db.update(bookings).set({ status: BookingStatus.PENDING }).where(eq(bookings.id, booking.id));
+        fixed++;
       }
 
       if (!validStatuses.includes(booking.status as any)) {
