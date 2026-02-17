@@ -31,6 +31,9 @@ export default function StaffSchedule() {
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set())
   const { data: monthlySchedule, isLoading } = useQuery<MonthlyScheduleData>({
     queryKey: ['/api/staff/dashboard/month'],
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
+    staleTime: 5000,
   })
 
   if (isLoading) {

@@ -678,49 +678,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date } = req.query;
       const targetDate = date ? new Date(date as string) : new Date();
       const startOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
-      const endOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59);
+      const endOfToday = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
 
-      // Bookings scheduled for today
-      const todayBookings = await db.select().from(bookings)
-        .where(and(
-          gte(bookings.startDate, startOfToday),
-          lte(bookings.startDate, endOfToday)
-        ));
+      const bookingConditions: any[] = [
+        gte(bookings.startDate, startOfToday),
+        lte(bookings.startDate, endOfToday),
+      ];
 
-      const bookingsWithDetails = await Promise.all(todayBookings.map(async (b) => {
-        const asset = await storage.getAsset(b.assetId);
-        const member = await storage.getUser(b.userId);
-        
-        // Check if expired (time passed and still pending)
+      const todaysBookings = await db
+        .select({
+          booking: bookings,
+          asset: assets,
+          user: users,
+        })
+        .from(bookings)
+        .leftJoin(assets, eq(bookings.assetId, assets.id))
+        .leftJoin(users, eq(bookings.userId, users.id))
+        .where(and(...bookingConditions))
+        .orderBy(bookings.startDate);
+
+      const bookingsWithDetails = todaysBookings.map(({ booking, asset, user }) => {
         let isExpired = false;
-        if (b.status === BookingStatus.PENDING) {
-          const bookingDate = new Date(b.startDate);
-          // b.startDate in DB might already have the time set if it was created correctly
-          // but our code usually stores date and time separately or combines them.
-          // Let's assume startDate is the canonical datetime.
+        if (booking.status === BookingStatus.PENDING) {
+          const bookingDate = new Date(booking.startDate);
           if (bookingDate < new Date()) {
             isExpired = true;
           }
         }
 
         return {
-          id: b.id,
+          id: booking.id,
           assetName: asset?.name || 'Unknown Asset',
-          assetId: b.assetId,
-          memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
-          status: b.status,
+          assetId: booking.assetId,
+          memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+          memberEmail: user?.email,
+          status: booking.status,
           isExpired,
-          startTime: b.startDate.toISOString(),
-          qrToken: b.qrToken
+          startTime: booking.startDate,
+          qrCode: booking.qrCode,
+          checkedOutAt: booking.checkedOutAt,
+          checkedInAt: booking.checkedInAt,
         };
-      }));
+      });
 
-      // Active Checkouts (Status: active)
       const activeCheckouts = await db.select({ count: count() })
         .from(bookings)
         .where(eq(bookings.status, BookingStatus.ACTIVE));
 
-      // Pending Returns (Status: active AND end_date < now)
       const now = new Date();
       const pendingReturns = await db.select({ count: count() })
         .from(bookings)
@@ -729,7 +733,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lt(bookings.endDate, now)
         ));
 
-      // Inventory stats
       const allAssets = await storage.getAssets();
       const inventory = {
         total: allAssets.length,
@@ -745,7 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activeCheckouts: activeCheckouts[0]?.count || 0,
         pendingReturns: pendingReturns[0]?.count || 0,
         maintenanceItems: inventory.maintenance,
-        totalToday: todayBookings.length
+        totalToday: todaysBookings.length
       });
     } catch (error) {
       console.error("Dashboard error:", error);
@@ -2036,70 +2039,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Staff APIs for dashboard operations
-  app.get("/api/staff/dashboard/today", requireStaff, async (req: any, res) => {
+  // Get schedule for the rest of the month
+  app.get("/api/staff/dashboard/month", requireStaff, async (req: any, res) => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
 
-      console.log(`[STAFF_DASHBOARD] User: ${req.user.id}, date range: ${today.toISOString()} to ${tomorrow.toISOString()}`);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      lastDay.setHours(23, 59, 59, 999);
 
-      // Try to get staff member's assigned locations for scoping
-      const staffLocations = await db
-        .select({ locationId: userLocations.locationId })
-        .from(userLocations)
-        .where(eq(userLocations.userId, req.user.id));
-
-      const locationIds = staffLocations.map(sl => sl.locationId);
-      const hasLocationScope = locationIds.length > 0;
-
-      // Build asset ID list: from locationInventory if staff has locations, otherwise ALL assets
-      let scopedAssetIds: string[] = [];
-      let scopedAssets: any[] = [];
-
-      if (hasLocationScope) {
-        const locationInventoryData = await db
-          .select()
-          .from(locationInventory)
-          .where(inArray(locationInventory.locationId, locationIds));
-
-        scopedAssetIds = locationInventoryData.map(li => li.assetId);
-
-        if (scopedAssetIds.length > 0) {
-          scopedAssets = await db.select().from(assets).where(inArray(assets.id, scopedAssetIds));
-        }
-
-        // If location exists but has no inventory records, fall back to all assets
-        if (scopedAssets.length === 0) {
-          console.log(`[STAFF_DASHBOARD] Staff has locations but no inventory records - falling back to all assets`);
-          scopedAssets = await db.select().from(assets);
-          scopedAssetIds = scopedAssets.map(a => a.id);
-        }
-      } else {
-        console.log(`[STAFF_DASHBOARD] Staff has no location assignments - showing all data`);
-        scopedAssets = await db.select().from(assets);
-        scopedAssetIds = scopedAssets.map(a => a.id);
-      }
-
-      // Build booking filter - scope to assets if we have them, else show all
-      const assetFilter = scopedAssetIds.length > 0
-        ? inArray(bookings.assetId, scopedAssetIds)
-        : undefined;
-
-      // Get today's bookings matching Schedule page statuses
-      const bookingConditions = [
+      const bookingConditions: any[] = [
         gte(bookings.startDate, today),
-        lte(bookings.startDate, tomorrow),
-        or(
-          eq(bookings.status, BookingStatus.PENDING),
-          eq(bookings.status, BookingStatus.ACTIVE)
-        )
+        lte(bookings.startDate, lastDay),
       ];
-      if (assetFilter) bookingConditions.unshift(assetFilter);
 
-      const todaysBookings = await db
+      const monthBookings = await db
         .select({
           booking: bookings,
           asset: assets,
@@ -2111,90 +2065,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(...bookingConditions))
         .orderBy(bookings.startDate);
 
-      console.log(`[STAFF_DASHBOARD] Today's bookings found: ${todaysBookings.length}`);
-
-      // Inventory stats from scoped assets
-      const totalItems = scopedAssets.length;
-      const maintenanceItems = scopedAssets.filter(a => a.maintenanceMode || a.status === 'maintenance').length;
-      const availableItems = scopedAssets.filter(a => a.isAvailable && !a.maintenanceMode).length;
-      const unavailableItems = totalItems - availableItems - maintenanceItems;
-
-      console.log(`[STAFF_DASHBOARD] Inventory: total=${totalItems}, available=${availableItems}, maintenance=${maintenanceItems}`);
-
-      // Get pending returns (checked_out bookings) scoped to same assets
-      const pendingConditions = [eq(bookings.status, BookingStatus.ACTIVE)];
-      if (assetFilter) pendingConditions.unshift(assetFilter);
-
-      const pendingCheckIns = await db
-        .select({ count: count() })
-        .from(bookings)
-        .where(and(...pendingConditions));
-      const pendingReturns = pendingCheckIns[0]?.count || 0;
-
-      console.log(`[STAFF_DASHBOARD] Pending returns: ${pendingReturns}`);
-
-      res.json({
-        bookings: todaysBookings.map(({ booking, asset, user }) => ({
-          id: booking.id,
-          assetName: asset?.name || 'Unknown',
-          assetId: asset?.id,
-          memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
-          memberEmail: user?.email,
-          status: booking.status,
-          startTime: booking.startDate,
-          qrCode: booking.qrCode,
-          checkedOutAt: booking.checkedOutAt,
-          checkedInAt: booking.checkedInAt,
-        })),
-        inventory: {
-          total: totalItems,
-          available: availableItems,
-          maintenance: maintenanceItems,
-          unavailable: unavailableItems,
-        },
-        pendingCheckIns: pendingReturns,
-        totalToday: todaysBookings.length,
-      });
-    } catch (error) {
-      console.error("Error fetching staff dashboard:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard data" });
-    }
-  });
-
-  // Get schedule for the rest of the month
-  app.get("/api/staff/dashboard/month", requireStaff, async (req: any, res) => {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Get the last day of current month
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-      // Get all bookings for rest of month
-      const monthBookings = await db
-        .select({
-          booking: bookings,
-          asset: assets,
-          user: users,
-        })
-        .from(bookings)
-        .leftJoin(assets, eq(bookings.assetId, assets.id))
-        .leftJoin(users, eq(bookings.userId, users.id))
-        .where(
-          and(
-            gte(bookings.startDate, today),
-            lte(bookings.startDate, lastDay),
-            or(
-              eq(bookings.status, 'pending'),
-              eq(bookings.status, 'active'),
-              eq(bookings.status, 'completed')
-            )
-          )
-        )
-        .orderBy(bookings.startDate);
-
-      // Group bookings by date
       const bookingsByDate: Record<string, any[]> = {};
+      let remainingCount = 0;
       monthBookings.forEach(({ booking, asset, user }) => {
         const dateKey = new Date(booking.startDate).toISOString().split('T')[0];
         if (!bookingsByDate[dateKey]) {
@@ -2204,7 +2076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: booking.id,
           assetName: asset?.name || 'Unknown',
           assetId: asset?.id,
-          memberName: `${user?.firstName} ${user?.lastName}`,
+          memberName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
           memberEmail: user?.email,
           status: booking.status,
           startTime: booking.startDate,
@@ -2213,12 +2085,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           checkedOutAt: booking.checkedOutAt,
           checkedInAt: booking.checkedInAt,
         });
+        if (booking.status === BookingStatus.PENDING || booking.status === BookingStatus.ACTIVE) {
+          remainingCount++;
+        }
       });
 
       res.json({
         bookingsByDate,
         currentMonth: today.toLocaleString('default', { month: 'long', year: 'numeric' }),
-        totalBookings: monthBookings.length,
+        totalBookings: remainingCount,
       });
     } catch (error) {
       console.error("Error fetching monthly schedule:", error);
