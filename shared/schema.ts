@@ -154,6 +154,7 @@ export const assets = sqliteTable("assets", {
   status: text("status").default(AssetStatus.AVAILABLE),
   dailyRate: real("daily_rate"),
   depositAmount: real("deposit_amount"),
+  creditPrice: real("credit_price"),
   mainPrice: real("main_price"), // Admin-defined adventure cost
   excellentTokenReward: integer("excellent_token_reward").default(0), // Admin-defined token reward
   isAddonOnly: integer("is_addon_only", { mode: "boolean" }).default(false),
