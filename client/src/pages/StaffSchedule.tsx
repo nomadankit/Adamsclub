@@ -220,12 +220,6 @@ export default function StaffSchedule() {
                                 </div>
 
                                 <div className="flex items-center gap-3 border-t md:border-t-0 pt-3 md:pt-0">
-                                  {booking.qrCode && (
-                                    <div className="bg-muted/50 px-3 py-1.5 rounded-md flex items-center gap-2 border">
-                                      <span className="text-[10px] font-bold text-muted-foreground uppercase">ID:</span>
-                                      <code className="text-xs font-mono font-bold tracking-wider">{booking.qrCode.substring(0, 12)}</code>
-                                    </div>
-                                  )}
                                   {booking.status === 'pending' || booking.status === 'active' ? (
                                     <Button 
                                       variant="secondary" 
