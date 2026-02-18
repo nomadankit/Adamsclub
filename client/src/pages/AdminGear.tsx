@@ -40,6 +40,8 @@ export default function AdminGear() {
     quantity: "0",
     isAvailable: true,
     maintenanceMode: false,
+    mainPrice: "",
+    excellentTokenReward: "",
   })
 
   // Fetch locations
@@ -78,6 +80,8 @@ export default function AdminGear() {
         condition: formData.condition,
         dailyRate: formData.dailyRate ? parseFloat(formData.dailyRate) : null,
         depositAmount: formData.depositAmount ? parseFloat(formData.depositAmount) : null,
+        mainPrice: formData.mainPrice ? parseFloat(formData.mainPrice) : null,
+        excellentTokenReward: formData.excellentTokenReward ? parseInt(formData.excellentTokenReward) : 0,
         type: formData.type,
         location: targetLocationId,
         isAvailable: formData.isAvailable,
@@ -172,6 +176,8 @@ export default function AdminGear() {
       quantity: inventoryItem?.quantity.toString() || "0",
       isAvailable: asset.isAvailable ?? true,
       maintenanceMode: asset.maintenanceMode ?? false,
+      mainPrice: asset.mainPrice?.toString() || "",
+      excellentTokenReward: asset.excellentTokenReward?.toString() || "0",
     })
   }
 
@@ -428,6 +434,29 @@ export default function AdminGear() {
                           <option value="fair">Fair</option>
                           <option value="poor">Poor</option>
                         </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-semibold mb-1 block">Adventure Price ($)</label>
+                        <Input
+                          placeholder="0"
+                          type="number"
+                          step="0.01"
+                          value={formData.mainPrice}
+                          onChange={(e) => setFormData({ ...formData, mainPrice: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold mb-1 block">Excellent Token Reward</label>
+                        <Input
+                          placeholder="0"
+                          type="number"
+                          step="1"
+                          value={formData.excellentTokenReward}
+                          onChange={(e) => setFormData({ ...formData, excellentTokenReward: e.target.value })}
+                        />
                       </div>
                     </div>
 

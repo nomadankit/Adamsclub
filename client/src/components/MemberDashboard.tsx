@@ -263,8 +263,52 @@ export function MemberDashboard() {
     setLocation('/events')
   }
 
+  const [showRewardModal, setShowRewardModal] = useState(false)
+  const [rewardAmount, setRewardAmount] = useState(0)
+
+  // Polling for recent rewards
+  useQuery({
+    queryKey: ['recent-rewards'],
+    queryFn: async () => {
+      const response = await fetch('/api/credits/history')
+      if (!response.ok) return []
+      const history = await response.json()
+      const fiveSecondsAgo = Date.now() - 5000
+      const recentEarned = history.find((t: any) => t.type === 'EARNED' && new Date(t.createdAt).getTime() > fiveSecondsAgo)
+      if (recentEarned) {
+        setRewardAmount(parseInt(recentEarned.amount))
+        setShowRewardModal(true)
+      }
+      return history
+    },
+    refetchInterval: 5000,
+    enabled: !!user
+  })
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Reward Modal */}
+      <Dialog open={showRewardModal} onOpenChange={setShowRewardModal}>
+        <DialogContent className="max-w-sm mx-auto text-center p-8">
+          <div className="mb-4 flex justify-center">
+            <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center animate-bounce">
+              <Star className="h-10 w-10 text-yellow-600" />
+            </div>
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Excellent!</DialogTitle>
+            <DialogDescription className="text-lg">
+              Congratulations! You earned <span className="font-bold text-primary">{rewardAmount}</span> Excellent Tokens for returning gear in perfect condition!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-6">
+            <Button onClick={() => setShowRewardModal(false)} className="w-full">
+              Awesome!
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Welcome Section with Adventure Theme */}
       <section className="bg-gradient-to-br from-primary/10 via-primary/5 to-blue-50/50 dark:from-primary/20 dark:via-primary/10 dark:to-blue-950/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-40 h-40 bg-primary/10 rounded-full -translate-y-20 translate-x-20" />

@@ -532,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/staff/bookings/:id/return", requireStaff, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { condition = 'available' } = req.body;
+      const { condition = 'EXCELLENT', condition_note } = req.body;
       const booking = await storage.getBooking(id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
@@ -540,21 +540,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Booking is not active" });
       }
 
+      if (condition === 'BAD' && !condition_note) {
+        return res.status(400).json({ message: "Condition note is required for BAD condition" });
+      }
+
+      const asset = await storage.getAsset(booking.assetId);
+      if (!asset) return res.status(404).json({ message: "Asset not found" });
+
       await db.transaction(async (tx) => {
+        // 1) Update booking status to COMPLETED
         await tx.update(bookings).set({ 
           status: BookingStatus.COMPLETED, 
           checkedInAt: new Date(),
-          checkedInBy: req.user.id 
+          checkedInBy: req.user.id,
+          conditionStatus: condition,
+          conditionNote: condition_note,
+          excellentTokensAwarded: condition === 'EXCELLENT' ? (asset.excellentTokenReward || 0) : 0,
+          updatedAt: new Date()
         }).where(eq(bookings.id, id));
         
+        // 2) If EXCELLENT, increment user.token_balance and insert transaction
+        if (condition === 'EXCELLENT' && asset.excellentTokenReward && asset.excellentTokenReward > 0) {
+          const user = await tx.select().from(users).where(eq(users.id, booking.userId)).get();
+          if (user) {
+            const currentBalance = parseInt(user.metadata?.tokenBalance || '0');
+            const newBalance = currentBalance + asset.excellentTokenReward;
+            
+            await tx.update(users).set({
+              metadata: {
+                ...(user.metadata || {}),
+                tokenBalance: newBalance.toString()
+              }
+            }).where(eq(users.id, booking.userId));
+
+            await tx.insert(tokenTransactions).values({
+              userId: booking.userId,
+              bookingId: id,
+              amount: asset.excellentTokenReward,
+              type: 'EARNED'
+            });
+          }
+        }
+
+        // 3) Update inventory status to AVAILABLE (or MAINTENANCE if needed)
         await tx.update(assets).set({ 
-          status: condition === 'maintenance' ? AssetStatus.MAINTENANCE : AssetStatus.AVAILABLE,
-          isAvailable: condition !== 'maintenance'
+          status: condition === 'MAINTENANCE' ? AssetStatus.MAINTENANCE : AssetStatus.AVAILABLE,
+          isAvailable: condition !== 'MAINTENANCE',
+          updatedAt: new Date()
         }).where(eq(assets.id, booking.assetId));
       });
 
-      res.json({ ok: true, message: "Gear returned" });
+      res.json({ ok: true, message: "Gear returned successfully" });
     } catch (error) {
+      console.error("Return error:", error);
       res.status(500).json({ message: "Failed to return gear" });
     }
   });

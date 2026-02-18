@@ -140,12 +140,13 @@ export default function StaffScan() {
     }
   }
 
-  const confirmReturn = (condition: string) => {
+  const confirmReturn = (condition: string, note?: string) => {
     if (!scanResult) return
     actionMutation.mutate({ 
       bookingId: scanResult.booking.id, 
       action: 'return',
-      condition 
+      condition,
+      condition_note: note
     })
     setSelectedAction(null)
   }
@@ -181,6 +182,9 @@ export default function StaffScan() {
       </div>
     )
   }
+
+  const [returnNote, setReturnNote] = useState("")
+  const [returnCondition, setReturnCondition] = useState<'EXCELLENT' | 'BAD' | null>(null)
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -313,18 +317,59 @@ export default function StaffScan() {
         </div>
       </main>
 
-      <Dialog open={selectedAction === 'return'} onOpenChange={(open) => !open && setSelectedAction(null)}>
+      <Dialog open={selectedAction === 'return'} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedAction(null)
+          setReturnCondition(null)
+          setReturnNote("")
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Return Equipment</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-4 py-4">
-            <Button onClick={() => confirmReturn('available')} className="bg-green-600 hover:bg-green-700">
-              Return as Available
-            </Button>
-            <Button onClick={() => confirmReturn('maintenance')} variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
-              Send to Maintenance
-            </Button>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Button 
+                onClick={() => setReturnCondition('EXCELLENT')} 
+                className={`h-24 flex flex-col gap-2 ${returnCondition === 'EXCELLENT' ? 'bg-green-600' : 'bg-green-500/20 text-green-700 hover:bg-green-500/30'}`}
+              >
+                <CheckCircle2 className="h-8 w-8" />
+                Excellent Condition
+              </Button>
+              <Button 
+                onClick={() => setReturnCondition('BAD')} 
+                className={`h-24 flex flex-col gap-2 ${returnCondition === 'BAD' ? 'bg-red-600' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30'}`}
+              >
+                <AlertTriangle className="h-8 w-8" />
+                Bad Condition
+              </Button>
+            </div>
+
+            {returnCondition === 'BAD' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Description of issues (required)</label>
+                <Textarea 
+                  placeholder="Describe the issues or damage..."
+                  value={returnNote}
+                  onChange={(e) => setReturnNote(e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1"
+                disabled={!returnCondition || (returnCondition === 'BAD' && !returnNote)}
+                onClick={() => confirmReturn(returnCondition!, returnNote)}
+              >
+                Complete Return
+              </Button>
+              <Button variant="outline" onClick={() => setSelectedAction(null)}>
+                Cancel
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

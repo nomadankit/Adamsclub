@@ -154,7 +154,8 @@ export const assets = sqliteTable("assets", {
   status: text("status").default(AssetStatus.AVAILABLE),
   dailyRate: real("daily_rate"),
   depositAmount: real("deposit_amount"),
-  creditPrice: real("credit_price"),
+  mainPrice: real("main_price"), // Admin-defined adventure cost
+  excellentTokenReward: integer("excellent_token_reward").default(0), // Admin-defined token reward
   isAddonOnly: integer("is_addon_only", { mode: "boolean" }).default(false),
   capacity: integer("capacity").default(1),
   isAvailable: integer("is_available", { mode: "boolean" }).default(true),
@@ -198,12 +199,24 @@ export const bookings = sqliteTable("bookings", {
   checkedOutBy: text("checked_out_by").references(() => users.id),
   checkedInAt: integer("checked_in_at", { mode: "timestamp" }),
   checkedInBy: text("checked_in_by").references(() => users.id),
+  conditionStatus: text("condition_status"), // EXCELLENT | BAD
+  conditionNote: text("condition_note"),
+  excellentTokensAwarded: integer("excellent_tokens_awarded").default(0),
   damageNotes: text("damage_notes"),
   damagePhotos: text("damage_photos", { mode: "json" }), // Store array as JSON
   cancellationReason: text("cancellation_reason"),
   bufferEnd: integer("buffer_end_datetime", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+});
+
+export const tokenTransactions = sqliteTable("token_transactions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  bookingId: text("booking_id").references(() => bookings.id),
+  amount: integer("amount").notNull(),
+  type: text("type").notNull(), // EARNED | SPENT
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
 });
 
 export const creditTransactions = sqliteTable("credit_transactions", {
