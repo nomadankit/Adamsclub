@@ -81,12 +81,15 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       })
 
       if (response.ok) {
-        window.location.href = '/auth'
+        // Clear any local storage/cache if necessary
+        window.location.href = '/login'
       } else {
         console.error('Logout failed')
+        window.location.href = '/login' // Fallback redirect
       }
     } catch (error) {
       console.error('Logout error:', error)
+      window.location.href = '/login' // Fallback redirect
     }
   }
 

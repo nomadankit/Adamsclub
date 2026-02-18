@@ -118,14 +118,19 @@ function Router() {
   // If not authenticated (user is null or undefined after loading), show waitlist landing page
   // If not authenticated (user is null or undefined after loading), show auth pages or redirect to login
   if (!user) {
+    // If we are on a protected route but not logged in, force redirect to login
+    const publicRoutes = ['/', '/login', '/signup', '/auth/callback', '/payment-success'];
+    const isPublicRoute = publicRoutes.some(route => 
+      pathname === route || pathname.startsWith('/reset-password/')
+    );
+
+    if (!isPublicRoute && pathname !== '/login') {
+      window.location.href = '/login';
+      return null;
+    }
+
     return (
       <Switch>
-        <Route path="/auth">
-          {() => {
-            window.location.href = '/login';
-            return null;
-          }}
-        </Route>
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
         <Route path="/auth/callback" component={AuthCallback} />
@@ -133,19 +138,10 @@ function Router() {
         <Route path="/payment-success" component={PaymentSuccess} />
         {/* Show LandingPage at root for marketing/welcome page */}
         <Route path="/" component={LandingPage} />
-        <Route path="/home">
-          {() => {
-            window.location.href = '/login';
-            return null;
-          }}
-        </Route>
-        <Route path="/admin/:rest*">
-          {() => {
-            window.location.href = '/login';
-            return null;
-          }}
-        </Route>
-        <Route component={NotFound} />
+        <Route component={() => {
+          window.location.href = '/login';
+          return null;
+        }} />
       </Switch>
     );
   }
