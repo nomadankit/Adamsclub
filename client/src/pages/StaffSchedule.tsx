@@ -50,19 +50,6 @@ export default function StaffSchedule() {
   const bookingsByDate = monthlySchedule?.bookingsByDate || {}
   const dates = Object.keys(bookingsByDate).sort()
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
-      case 'completed':
-        return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-      case 'pending':
-        return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
-      default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-    }
-  }
-
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'active':
@@ -71,8 +58,28 @@ export default function StaffSchedule() {
         return 'Returned'
       case 'pending':
         return 'Pending'
+      case 'cancelled':
+        return 'Cancelled'
+      case 'no_show':
+        return 'No Show'
       default:
         return status
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+      case 'completed':
+        return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+      case 'pending':
+        return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+      case 'cancelled':
+      case 'no_show':
+        return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+      default:
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
     }
   }
 
@@ -219,14 +226,16 @@ export default function StaffSchedule() {
                                       <code className="text-xs font-mono font-bold tracking-wider">{booking.qrCode.substring(0, 12)}</code>
                                     </div>
                                   )}
-                                  <Button 
-                                    variant="secondary" 
-                                    size="sm" 
-                                    className="h-8 text-xs font-bold"
-                                    onClick={() => setLocation(`/staff/scan?id=${booking.id}`)}
-                                  >
-                                    View Details
-                                  </Button>
+                                  {booking.status === 'pending' || booking.status === 'active' ? (
+                                    <Button 
+                                      variant="secondary" 
+                                      size="sm" 
+                                      className="h-8 text-xs font-bold"
+                                      onClick={() => setLocation(`/staff/scan?id=${booking.id}`)}
+                                    >
+                                      Scan
+                                    </Button>
+                                  ) : null}
                                 </div>
                               </div>
                             </CardContent>

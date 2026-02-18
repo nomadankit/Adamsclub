@@ -89,13 +89,13 @@ async function normalizeBookingStatuses() {
         continue;
       }
 
-      // NO-SHOW CLEANUP: If status is 'pending' but start date is in the past (e.g. 2 hours), cancel it.
+      // NO-SHOW CLEANUP: If status is 'pending' but start date is in the past (e.g. 2 hours), mark as no-show.
       // This handles the case in the screenshot (11:01 booking still showing at 5:12 PM)
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
       if (booking.status === BookingStatus.PENDING && bookingStartDate < twoHoursAgo) {
-        console.log(`[STARTUP] Cancelling no-show booking: ${booking.id} (Scheduled Start: ${booking.startDate})`);
+        console.log(`[STARTUP] Marking no-show booking: ${booking.id} (Scheduled Start: ${booking.startDate})`);
         await db.update(bookings).set({ 
-          status: BookingStatus.CANCELLED,
+          status: 'no_show',
           updatedAt: now,
           cancellationReason: "No-show: Booking expired before check-out"
         }).where(eq(bookings.id, booking.id));
