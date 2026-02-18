@@ -1,0 +1,140 @@
+{
+  "task": "Implement 'Excellent Tokens' reward workflow for adventure gear return in Adam’s Club",
+  "role": "You are a senior full-stack engineer. Design and implement a secure, atomic, end-to-end workflow integrated with Member, Staff, and Admin panels.",
+  "feature_name": "Excellent Tokens",
+  "objective": "Reward members with Excellent Tokens when returned gear is in excellent condition. No reward if gear is in bad condition.",
+  "business_rules": {
+    "admin_configuration": [
+      "Each gear/equipment must have two admin-defined values:",
+      "1) mainPrice (fixed adventure cost in currency)",
+      "2) excellentTokenReward (fixed token amount earned if gear returned in excellent condition)",
+      "Admins configure these in Admin Panel per equipment."
+    ],
+    "booking_pricing": [
+      "When member books an adventure:",
+      "Total charge = mainPrice + requiredTokenCost (if applicable).",
+      "Deduct tokens + charge currency amount atomically.",
+      "Store booking snapshot: mainPrice, excellentTokenReward at time of booking."
+    ],
+    "return_workflow": [
+      "When staff scans booking/gear at return:",
+      "Staff must choose condition:",
+      "Option 1: Excellent Condition",
+      "Option 2: Bad Condition",
+      "If 'Bad Condition' selected:",
+      "Show dropdown or text box to describe issue (required field).",
+      "If Excellent:",
+      "Member earns excellentTokenReward tokens.",
+      "If Bad:",
+      "Member earns 0 tokens."
+    ],
+    "reward_logic": [
+      "If condition === 'EXCELLENT':",
+      "Increment member.tokenBalance by excellentTokenReward.",
+      "Record transaction in token_transactions table.",
+      "Trigger UI popup in member panel.",
+      "If condition === 'BAD':",
+      "Do not increment tokens.",
+      "Store condition note in booking record."
+    ]
+  },
+  "state_machine_updates": {
+    "booking_status_flow": [
+      "PENDING -> ACTIVE (Start Adventure)",
+      "ACTIVE -> COMPLETED (Return Gear)",
+      "Return step must include condition evaluation."
+    ]
+  },
+  "database_requirements": {
+    "equipment_table": [
+      "Add column: main_price (numeric)",
+      "Add column: excellent_token_reward (integer)"
+    ],
+    "users_table": [
+      "Ensure token_balance (integer) exists"
+    ],
+    "bookings_table": [
+      "Add columns:",
+      "condition_status (EXCELLENT | BAD)",
+      "condition_note (text nullable)",
+      "excellent_tokens_awarded (integer default 0)"
+    ],
+    "token_transactions_table": [
+      "id",
+      "user_id",
+      "booking_id",
+      "amount",
+      "type (EARNED | SPENT)",
+      "created_at"
+    ]
+  },
+  "api_endpoints_required": [
+    {
+      "endpoint": "POST /api/staff/bookings/:id/return",
+      "logic": [
+        "Validate booking status ACTIVE.",
+        "Require condition field.",
+        "If BAD, require condition_note.",
+        "Use DB transaction:",
+        "1) Update booking status to COMPLETED.",
+        "2) Update condition_status + note.",
+        "3) If EXCELLENT, increment user.token_balance.",
+        "4) Insert token transaction record if applicable.",
+        "5) Update inventory status to AVAILABLE.",
+        "Commit transaction."
+      ]
+    }
+  ],
+  "member_panel_behavior": [
+    "When booking return is processed:",
+    "If excellent tokens awarded:",
+    "Trigger real-time popup:",
+    "Message: 'Congratulations! You earned X Excellent Tokens!'",
+    "Display updated token balance.",
+    "Provide Close button.",
+    "Popup should appear once per award."
+  ],
+  "real_time_updates": [
+    "Use Supabase real-time or polling to detect booking status change.",
+    "Member panel must auto-refresh token balance.",
+    "Staff dashboard metrics must reflect updated booking."
+  ],
+  "ui_requirements_staff_panel": [
+    "After scanning booking:",
+    "Display condition selection buttons:",
+    "Excellent Condition (green button)",
+    "Bad Condition (red button)",
+    "If Bad selected -> show textarea/dropdown for description (required).",
+    "Disable submit until condition chosen."
+  ],
+  "security_rules": [
+    "Only staff/admin can process return endpoint.",
+    "Token increment must be server-side only.",
+    "Do not allow client to manipulate token values.",
+    "All reward logic must run inside transaction."
+  ],
+  "atomicity_requirement": [
+    "Booking completion, token award, and inventory update must succeed or fail together."
+  ],
+  "verification_checklist": [
+    "Admin sets main price and excellentTokenReward.",
+    "Member books adventure and is charged correctly.",
+    "Staff returns gear with EXCELLENT -> member receives tokens + popup.",
+    "Staff returns gear with BAD -> no tokens + condition stored.",
+    "Token balance updates correctly.",
+    "Dashboard and schedule reflect completed booking."
+  ],
+  "deliverables": [
+    "List of modified backend files.",
+    "List of modified frontend files.",
+    "DB migration changes.",
+    "Test steps to validate full workflow."
+  ],
+  "start_here_search_terms": [
+    "return credits",
+    "booking return endpoint",
+    "staff scan return",
+    "token balance",
+    "admin equipment pricing"
+  ]
+}
