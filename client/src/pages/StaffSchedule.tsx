@@ -167,69 +167,73 @@ export default function StaffSchedule() {
 
             {/* Schedule by Date */}
             {dates.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {dates.map((dateKey) => {
                   const dayBookings = bookingsByDate[dateKey] || []
-                  const isExpanded = expandedDates.has(dateKey)
                   
                   return (
-                    <Card key={dateKey} className="overflow-hidden" data-testid={`card-date-${dateKey}`}>
-                      <CardHeader 
-                        className="p-4 cursor-pointer hover-elevate"
-                        onClick={() => toggleDateExpanded(dateKey)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Calendar className="h-5 w-5 text-primary" />
-                            <div>
-                              <div className="font-semibold">{formatDate(dateKey)}</div>
-                              <div className="text-sm text-muted-foreground">{dayBookings.length} booking{dayBookings.length !== 1 ? 's' : ''}</div>
-                            </div>
-                          </div>
-                          <ChevronUp 
-                            className={`h-5 w-5 text-muted-foreground transition-transform ${isExpanded ? '' : 'rotate-180'}`}
-                          />
-                        </div>
-                      </CardHeader>
+                    <div key={dateKey} className="space-y-3" data-testid={`section-date-${dateKey}`}>
+                      <div className="flex items-center gap-3 px-1">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                          {formatDate(dateKey)}
+                        </h3>
+                        <Badge variant="outline" className="ml-auto text-[10px] py-0 h-4">
+                          {dayBookings.length} {dayBookings.length === 1 ? 'Booking' : 'Bookings'}
+                        </Badge>
+                      </div>
 
-                      {isExpanded && (
-                        <CardContent className="p-0 border-t">
-                          <div className="space-y-2 p-4">
-                            {dayBookings.map((booking) => (
-                              <div 
-                                key={booking.id} 
-                                className="p-3 rounded-md border bg-card"
-                                data-testid={`booking-detail-${booking.id}`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="font-semibold text-sm truncate">{booking.assetName}</h4>
-                                      <Badge className={`${getStatusColor(booking.status)} text-xs`}>
-                                        {getStatusLabel(booking.status)}
-                                      </Badge>
+                      <div className="grid gap-3">
+                        {dayBookings.map((booking) => (
+                          <Card 
+                            key={booking.id} 
+                            className="overflow-hidden border-l-4 border-l-primary/50 hover:border-l-primary transition-all"
+                            data-testid={`booking-card-${booking.id}`}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="font-bold text-base truncate">{booking.assetName}</h4>
+                                    <Badge className={`${getStatusColor(booking.status)} text-[10px] px-2 py-0 uppercase font-bold tracking-tighter`}>
+                                      {getStatusLabel(booking.status)}
+                                    </Badge>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-1.5">
+                                      <User className="h-3.5 w-3.5" />
+                                      <span className="font-medium text-foreground/80">{booking.memberName}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                                      <User className="h-3 w-3" />
-                                      <span className="truncate">{booking.memberName}</span>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                                      <div className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        <span>{formatTime(booking.startTime)}</span>
-                                      </div>
-                                      {booking.qrCode && (
-                                        <div className="font-mono text-xs truncate">QR: {booking.qrCode.substring(0, 8)}...</div>
-                                      )}
+                                    <div className="flex items-center gap-1.5">
+                                      <Clock className="h-3.5 w-3.5" />
+                                      <span className="font-medium text-foreground/80">{formatTime(booking.startTime)} - {formatTime(booking.endTime)}</span>
                                     </div>
                                   </div>
                                 </div>
+
+                                <div className="flex items-center gap-3 border-t md:border-t-0 pt-3 md:pt-0">
+                                  {booking.qrCode && (
+                                    <div className="bg-muted/50 px-3 py-1.5 rounded-md flex items-center gap-2 border">
+                                      <span className="text-[10px] font-bold text-muted-foreground uppercase">ID:</span>
+                                      <code className="text-xs font-mono font-bold tracking-wider">{booking.qrCode.substring(0, 12)}</code>
+                                    </div>
+                                  )}
+                                  <Button 
+                                    variant="secondary" 
+                                    size="sm" 
+                                    className="h-8 text-xs font-bold"
+                                    onClick={() => setLocation(`/staff/scan?id=${booking.id}`)}
+                                  >
+                                    View Details
+                                  </Button>
+                                </div>
                               </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      )}
-                    </Card>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
                   )
                 })}
               </div>
