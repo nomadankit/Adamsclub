@@ -183,6 +183,7 @@ function Router() {
           <Route path="/upgrade" component={UpgradePlan} />
           <Route path="/events" component={MemberEvents} />
           {/* Admin routes */}
+          <Route path="/admin" component={user?.role === 'admin' ? AdminHome : RoleBasedRedirect} />
           <Route path="/admin/home" component={user?.role === 'admin' ? AdminHome : RoleBasedRedirect} />
           <Route path="/admin/dashboard" component={user?.role === 'admin' ? AdminDashboard : RoleBasedRedirect} />
           <Route path="/admin/perks" component={user?.role === 'admin' ? AdminPerks : RoleBasedRedirect} />

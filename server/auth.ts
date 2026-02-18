@@ -55,7 +55,7 @@ export async function setupAuth(app: Express) {
     async (email, password, done) => {
       try {
         const users = await storage.getAllUsers();
-        const user = users.find(u => u.email === email);
+        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
         if (!user) {
           return done(null, false, { message: 'Invalid email or password' });
