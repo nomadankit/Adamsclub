@@ -476,7 +476,11 @@ export default function AdminLocations() {
                             className="gap-2"
                           >
                             <Users className="h-4 w-4" />
-                            <span className="text-xs">{staffAtLocation?.length || 0}</span>
+                            <span className="text-xs">
+                              {useQuery<StaffMember[]>({
+                                queryKey: ["/api/admin/locations", location.id, "staff"],
+                              }).data?.length || 0}
+                            </span>
                           </Button>
                           <Button
                             size="icon"
