@@ -1555,6 +1555,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      const userEmail = (req.user as any).email;
+      if (userEmail !== 'ankit3765kumar@gmail.com') {
+        return res.status(403).json({ 
+          ok: false, 
+          message: 'Forbidden: Only ankit3765kumar@gmail.com can use the role toggle',
+          code: 'FORBIDDEN_ROLE_TOGGLE'
+        });
+      }
+
       const userId = (req.user as any).id;
 
       // Actually update the user role in the database

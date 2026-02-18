@@ -68,7 +68,7 @@ export function Header() {
           <div className="flex items-center space-x-2">
             <DateTimeDisplay />
             {/* Temporary Role Selector - For dev purposes */}
-            {user && (user.role === 'admin' || user.email === 'ankit3765kumar@gmail.com') && (
+            {user && user.email === 'ankit3765kumar@gmail.com' && (
               <div className="flex items-center space-x-2">
                 <Badge variant="outline" className="text-xs">
                   DEV
