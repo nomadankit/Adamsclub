@@ -1,0 +1,98 @@
+{
+  "task": "Restrict role toggle so ONLY ankit3765kumar@gmail.com can use the Admin/Staff/Member toggle",
+  "role": "You are a senior full-stack engineer. Implement secure server-side authorization and matching UI gating.",
+  "requirements": {
+    "primary_rule": "Only the authenticated user with email ankit3765kumar@gmail.com is allowed to use the admin-staff-member role toggle feature.",
+    "security_rule": "This must be enforced on the backend (not just frontend). Frontend should also hide/disable the toggle for everyone else.",
+    "non_breaking_rule": "All other admins/staff/members should continue to work exactly as they do now. Their roles only change through existing admin role-change mechanisms (as currently implemented).",
+    "compatibility": "The app uses Supabase Auth. Supabase keys are already in code and Replit Secrets. Use the existing Supabase client auth/session system."
+  },
+  "implementation_steps": [
+    {
+      "step": 1,
+      "title": "Find the existing role toggle + role update endpoint",
+      "details": [
+        "Locate the UI component where the role toggle exists (Admin/Staff/Member toggle).",
+        "Locate the backend endpoint that applies role changes (e.g., POST /api/admin/change-role, /api/users/:id/role, etc.)."
+      ]
+    },
+    {
+      "step": 2,
+      "title": "Add strict backend authorization",
+      "details": [
+        "Read the currently authenticated user from the request (Supabase JWT from Authorization header or your existing auth middleware).",
+        "Extract the authenticated user's email from Supabase auth claims/user lookup.",
+        "If authenticated user's email !== 'ankit3765kumar@gmail.com', return HTTP 403 and DO NOT change any roles.",
+        "Keep existing validation for allowed roles: admin | staff | member.",
+        "Return consistent JSON responses: { ok: false, message, code } on errors; { ok: true } on success."
+      ]
+    },
+    {
+      "step": 3,
+      "title": "Add frontend gating (hide or disable toggle)",
+      "details": [
+        "In the toggle component, fetch the current user via supabase.auth.getUser() or your existing auth context.",
+        "If user.email !== 'ankit3765kumar@gmail.com', hide the toggle entirely OR disable it with a tooltip explaining lack of permission.",
+        "Do not alter other UI or role behavior."
+      ]
+    },
+    {
+      "step": 4,
+      "title": "Ensure other admins can still manage roles through existing system",
+      "details": [
+        "Do NOT block existing admin role changes unrelated to the toggle, unless those changes are routed through the same endpoint.",
+        "If the current system uses the same endpoint for all role changes, then implement a separate endpoint for the toggle feature ONLY, protected by the email allowlist.",
+        "Alternatively, add a request flag like { source: 'toggle' } and only restrict when source==='toggle'. Prefer separate endpoint for clarity."
+      ]
+    },
+    {
+      "step": 5,
+      "title": "Optional: Add DB/RLS protection if applicable",
+      "details": [
+        "If Supabase RLS is enabled for the users table, update RLS policies to ensure only auth.email() = 'ankit3765kumar@gmail.com' can update role via the toggle path.",
+        "Do not expose service_role key in client code.",
+        "If the server uses service_role for admin ops, still enforce the email check BEFORE any DB update."
+      ]
+    },
+    {
+      "step": 6,
+      "title": "Testing / Verification",
+      "details": [
+        "Login as ankit3765kumar@gmail.com: toggle is visible, role changes succeed (200).",
+        "Login as any other admin: toggle is hidden/disabled; if forced API call attempted, endpoint returns 403 and no DB change occurs.",
+        "Login as staff/member: toggle not visible; API returns 403 if attempted.",
+        "Confirm existing role management still works as before (outside the toggle feature)."
+      ]
+    }
+  ],
+  "constants": {
+    "super_admin_email": "ankit3765kumar@gmail.com",
+    "allowed_roles": ["admin", "staff", "member"],
+    "error_codes": {
+      "unauthorized": "UNAUTHORIZED",
+      "forbidden": "FORBIDDEN_ROLE_TOGGLE",
+      "invalid_role": "INVALID_ROLE",
+      "internal": "INTERNAL_ERROR"
+    }
+  },
+  "deliverables": [
+    "Show the exact backend files changed (route/controller + auth helper if needed).",
+    "Show the exact frontend files changed (toggle component).",
+    "Confirm backend enforcement is in place (403 for non-allowed email).",
+    "Provide quick manual test steps and expected results."
+  ],
+  "notes": [
+    "Backend enforcement is mandatory; frontend gating alone is not secure.",
+    "If multiple environments exist (Replit preview + production), ensure auth email extraction works in both.",
+    "Do not leak secrets in logs."
+  ],
+  "start_here_search_terms": [
+    "change-role",
+    "role toggle",
+    "admin toggle",
+    "users update role",
+    "supabase auth middleware",
+    "Authorization Bearer",
+    "supabase.auth.getUser"
+  ]
+}
