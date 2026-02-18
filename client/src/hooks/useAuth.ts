@@ -1,5 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface UserCapabilities {
   user_id: string;
@@ -16,6 +18,9 @@ interface UserCapabilities {
 }
 
 export function useAuth() {
+  const queryClient = useQueryClient();
+  const [isInitializing, setIsInitializing] = useState(true);
+
   const { data: user, isLoading: userLoading, error: userError } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     queryFn: async () => {
@@ -25,7 +30,6 @@ export function useAuth() {
       
       if (!response.ok) {
         if (response.status === 401) {
-          // Not authenticated - return null instead of throwing
           return null as any;
         }
         throw new Error(`Failed to fetch user: ${response.status}`);
@@ -36,10 +40,31 @@ export function useAuth() {
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Removed the original capabilities query here as it is being replaced by the modified version below.
+  // Sync Supabase Auth state with our backend session
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[AUTH_STATE] ${event}`, session?.user?.email);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Force refresh backend user query to sync
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } else if (event === 'SIGNED_OUT') {
+        queryClient.setQueryData(["/api/auth/user"], null);
+      }
+      
+      if (isInitializing) setIsInitializing(false);
+    });
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) setIsInitializing(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [queryClient, isInitializing]);
 
   const hasPermission = (permissionName: string, locationId?: string): boolean => {
     if (!capabilities) return false;
@@ -55,7 +80,6 @@ export function useAuth() {
     return !locationId; // No location required
   };
 
-  // The following is the modified query for capabilities with error handling.
   const { data: capabilities, error: capabilitiesError, isLoading: capabilitiesLoading } = useQuery<UserCapabilities>({
     queryKey: ['user-capabilities', user?.id],
     queryFn: async () => {
@@ -64,9 +88,7 @@ export function useAuth() {
           credentials: 'include'
         });
         if (!response.ok) {
-          // Don't throw for 404/500 errors during initial setup
           if (response.status >= 404) {
-            console.warn('Capabilities endpoint not ready, using fallback');
             return {
               user_id: user?.id || '',
               roles: [user?.role || 'member'],
@@ -78,7 +100,6 @@ export function useAuth() {
         }
         return response.json();
       } catch (error) {
-        console.warn('Capabilities fetch failed, using fallback:', error);
         return {
           user_id: user?.id || '',
           roles: [user?.role || 'member'],
@@ -87,33 +108,34 @@ export function useAuth() {
         };
       }
     },
-    enabled: !!user, // Only fetch if user is authenticated
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    retry: false // Don't retry, use fallback instead
+    retry: false 
   });
-
 
   const logout = async () => {
     try {
+      await supabase.auth.signOut();
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
 
-      if (response.ok) {
+      if (response.ok || true) {
         window.location.href = '/login';
       }
     } catch (error) {
       console.error('Logout error:', error);
+      window.location.href = '/login';
     }
   };
 
   return {
     user,
     capabilities,
-    isLoading: userLoading || capabilitiesLoading,
+    isLoading: userLoading || capabilitiesLoading || isInitializing,
     isAuthenticated: !!user,
     hasPermission,
     logout,

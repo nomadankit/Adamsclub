@@ -1,0 +1,104 @@
+{
+  "task": "Fix Google OAuth redirect loop and ensure Local Email/Password Login works using Supabase Client Auth in Adam’s Club",
+  "role": "You are a senior full-stack engineer specializing in Supabase Auth, OAuth flows, SPA session handling, and secure authentication architecture.",
+  "problem_summary": {
+    "symptoms": [
+      "When users use Google Sign In / Sign Up, they are redirected back to the login page repeatedly (redirect loop).",
+      "Authentication does not persist properly after OAuth callback.",
+      "Local email/password login must also function properly using Supabase client auth."
+    ],
+    "expected_behavior": [
+      "Google OAuth login completes successfully and redirects to the correct authenticated page.",
+      "Local email/password login works using Supabase client auth (no custom insecure auth logic).",
+      "Session persists across refresh and navigation.",
+      "Route guards do not cause redirect loops.",
+      "Authenticated users are not redirected back to /login."
+    ],
+    "constraints": [
+      "Supabase keys already exist in the project and in Replit Secrets.",
+      "Use proper supabase-js client auth methods.",
+      "Do not hardcode secrets.",
+      "Do not expose service role keys to client.",
+      "Use a single Supabase client instance."
+    ]
+  },
+  "requirements": {
+    "authentication_system": {
+      "google_oauth": [
+        "Use supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } }).",
+        "redirectTo must dynamically use window.location.origin and match Supabase allowed redirect URLs.",
+        "Implement proper OAuth callback handling.",
+        "Use detectSessionInUrl if necessary.",
+        "After callback, restore session and redirect to intended page."
+      ],
+      "local_login": [
+        "Use supabase.auth.signInWithPassword({ email, password }) for login.",
+        "Use supabase.auth.signUp({ email, password }) for registration.",
+        "Do NOT use custom JWT or manual session storage.",
+        "Ensure email/password login and OAuth login share the same session handling logic.",
+        "Ensure both methods update auth state consistently."
+      ],
+      "session_persistence": [
+        "Enable persistSession: true.",
+        "Enable autoRefreshToken: true.",
+        "Ensure only one Supabase client instance is used.",
+        "Ensure session is stored in localStorage correctly.",
+        "Ensure route guards wait for session resolution before redirecting."
+      ]
+    }
+  },
+  "implementation_steps": [
+    "1) Locate Supabase client initialization file and confirm proper env variable usage.",
+    "2) Ensure createClient includes correct config (persistSession, autoRefreshToken).",
+    "3) Fix Google OAuth redirect logic and callback handling.",
+    "4) Implement or correct local email/password login using Supabase client methods.",
+    "5) Refactor route guards so they do not redirect while auth state is loading.",
+    "6) Ensure authenticated routes rely on supabase.auth.getSession() or onAuthStateChange.",
+    "7) Remove any legacy/custom auth logic that conflicts with Supabase client sessions.",
+    "8) Ensure logout uses supabase.auth.signOut() properly.",
+    "9) Add DEV-only logging for auth state transitions.",
+    "10) Verify both login methods behave identically regarding session persistence."
+  ],
+  "route_guard_rules": {
+    "must": [
+      "Wait for auth initialization before redirecting.",
+      "Redirect to /login only if session === null after loading completes.",
+      "Prevent infinite redirect loops."
+    ],
+    "must_not": [
+      "Redirect during auth loading state.",
+      "Force reload loops.",
+      "Manually clear session storage on page load."
+    ]
+  },
+  "server_considerations": [
+    "If backend verifies tokens, ensure it reads Supabase access token from Authorization header.",
+    "Ensure server does not invalidate valid Supabase JWTs.",
+    "Ensure CORS settings allow auth headers."
+  ],
+  "deliverables": [
+    "Root cause explanation of redirect loop.",
+    "Updated Supabase client initialization.",
+    "Correct Google OAuth implementation.",
+    "Correct Local Email/Password login implementation.",
+    "Fixed route guard logic.",
+    "List of files changed.",
+    "Verification checklist."
+  ],
+  "verification_checklist": [
+    "Google login works and redirects correctly.",
+    "Local login works correctly.",
+    "Refresh page stays logged in.",
+    "Open new tab stays logged in.",
+    "Protected routes accessible when authenticated.",
+    "Logout works and redirects to login.",
+    "No redirect loop occurs."
+  ],
+  "start_here": [
+    "Search for supabase client initialization.",
+    "Search for signInWithOAuth usage.",
+    "Search for signInWithPassword and signUp usage.",
+    "Search for route guard implementation.",
+    "Search for any custom auth logic interfering with Supabase."
+  ]
+}
