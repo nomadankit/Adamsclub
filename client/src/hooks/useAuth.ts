@@ -103,7 +103,7 @@ export function useAuth() {
       });
 
       if (response.ok) {
-        window.location.href = '/auth';
+        window.location.href = '/login';
       }
     } catch (error) {
       console.error('Logout error:', error);

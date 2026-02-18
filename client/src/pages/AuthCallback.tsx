@@ -16,13 +16,13 @@ export default function AuthCallback() {
 
         if (error) {
           console.error('Auth error:', error);
-          setLocation('/auth');
+          setLocation('/login');
           return;
         }
 
         if (!session?.user?.email) {
           console.error('No user session found');
-          setLocation('/auth');
+          setLocation('/login');
           return;
         }
 
@@ -45,7 +45,7 @@ export default function AuthCallback() {
           console.error('Backend auth error:', data);
           // Sign out from Supabase to clear the session and prevent redirect loop
           await supabase.auth.signOut();
-          setLocation('/auth');
+          setLocation('/login');
           return;
         }
 
@@ -56,7 +56,7 @@ export default function AuthCallback() {
         window.location.href = '/home';
       } catch (err) {
         console.error('Callback error:', err);
-        setLocation('/auth');
+        setLocation('/login');
       }
     };
 
