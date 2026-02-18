@@ -32,7 +32,16 @@ export default function Login() {
       });
 
       if (response.ok) {
-        window.location.href = '/home'; // Redirect to home on success
+        const data = await response.json();
+        const userRole = data.user?.role || 'member';
+        
+        if (userRole === 'admin') {
+          window.location.href = '/admin/home';
+        } else if (userRole === 'staff') {
+          window.location.href = '/staff/home';
+        } else {
+          window.location.href = '/home';
+        }
         return;
       }
 

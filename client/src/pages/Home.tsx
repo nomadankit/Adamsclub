@@ -134,6 +134,12 @@ export default function Home() {
     return <StaffDashboard />
   }
 
+  // For admin users, redirect to admin home
+  if (user?.role === 'admin') {
+    setLocation('/admin/home');
+    return null;
+  }
+
   // Get unique asset categories from available assets
   const assetsByCategory = assets.reduce((acc: any, asset: any) => {
     const category = asset.category || 'General'
