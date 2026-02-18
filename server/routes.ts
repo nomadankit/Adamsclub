@@ -70,8 +70,6 @@ async function normalizeBookingStatuses() {
       const bookingStartDate = new Date(booking.startDate);
       
       // Safety: If status is 'active' but end date is in the past, complete it.
-      // Also if status is 'pending' but start date is way in the past (e.g. 24h), cancel or complete it?
-      // For now, let's focus on 'active' as requested.
       if (booking.status === BookingStatus.ACTIVE && bookingEndDate < now) {
         console.log(`[STARTUP] Auto-completing overdue booking: ${booking.id} (Scheduled End: ${booking.endDate})`);
         await db.transaction(async (tx) => {
@@ -87,6 +85,20 @@ async function normalizeBookingStatuses() {
             updatedAt: now
           }).where(eq(assets.id, booking.assetId));
         });
+        fixed++;
+        continue;
+      }
+
+      // NO-SHOW CLEANUP: If status is 'pending' but start date is in the past (e.g. 2 hours), cancel it.
+      // This handles the case in the screenshot (11:01 booking still showing at 5:12 PM)
+      const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+      if (booking.status === BookingStatus.PENDING && bookingStartDate < twoHoursAgo) {
+        console.log(`[STARTUP] Cancelling no-show booking: ${booking.id} (Scheduled Start: ${booking.startDate})`);
+        await db.update(bookings).set({ 
+          status: BookingStatus.CANCELLED,
+          updatedAt: now,
+          cancellationReason: "No-show: Booking expired before check-out"
+        }).where(eq(bookings.id, booking.id));
         fixed++;
         continue;
       }
