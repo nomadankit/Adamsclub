@@ -1,6 +1,6 @@
 
 import { db } from "../db";
-import { assets, AssetType, AssetStatus, locations } from "../../shared/schema";
+import { assets, AssetType, AssetStatus, locations, locationInventory } from "../../shared/schema";
 
 async function addDemoData() {
     console.log("🌱 Adding demo gear and consumables...");
@@ -8,6 +8,11 @@ async function addDemoData() {
     // Get the main location
     const locationList = await db.select().from(locations).limit(1);
     const locationId = locationList.length > 0 ? locationList[0].id : null;
+
+    if (!locationId) {
+        console.error("❌ No locations found. Please run the main seed script first.");
+        process.exit(1);
+    }
 
     const demoAssets = [
         // Gear
@@ -97,11 +102,24 @@ async function addDemoData() {
 
     for (const asset of demoAssets) {
         try {
-            await db.insert(assets).values(asset).onConflictDoUpdate({
+            const [insertedAsset] = await db.insert(assets).values(asset).onConflictDoUpdate({
                 target: assets.barcode,
                 set: asset
-            });
+            }).returning();
+            
             console.log(`✅ Added/Updated: ${asset.name}`);
+
+            // Ensure location inventory exists
+            await db.insert(locationInventory).values({
+                locationId: locationId,
+                assetId: insertedAsset.id,
+                quantity: asset.type === AssetType.CONSUMABLE ? 50 : 5,
+                creditPrice: asset.creditPrice || 0,
+            }).onConflictDoUpdate({
+                target: [locationInventory.locationId, locationInventory.assetId],
+                set: { quantity: asset.type === AssetType.CONSUMABLE ? 50 : 5 }
+            });
+            console.log(`📦 Inventory updated for: ${asset.name}`);
         } catch (error) {
             console.error(`❌ Error adding ${asset.name}:`, error);
         }
