@@ -21,47 +21,22 @@ export default function Login() {
     setIsLoading(true)
 
     try {
-      // Try backend local login first (for test accounts)
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: loginData.email,
-          password: loginData.password,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const userRole = data.user?.role || 'member';
-        
-        if (userRole === 'admin') {
-          window.location.href = '/admin/home';
-        } else if (userRole === 'staff') {
-          window.location.href = '/staff/home';
-        } else {
-          window.location.href = '/home';
-        }
-        return;
-      }
-
-      // If backend login fails, try Supabase (for production/legacy compatibility)
-      const { supabase } = await import('@/lib/supabase')
+      const { supabase } = await import('@/lib/supabase');
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: loginData.email,
         password: loginData.password,
-      })
+      });
 
       if (signInError) {
-        setError(signInError.message)
-        setIsLoading(false)
-        return
+        setError(signInError.message);
+        setIsLoading(false);
+        return;
       }
 
       if (data.user && data.session) {
         // Sync session with backend to maintain HTTP-only cookie session
-        const response = await fetch('/api/auth/supabase/callback', {
+        const syncResponse = await fetch('/api/auth/supabase/callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -70,17 +45,26 @@ export default function Login() {
             user: data.user,
             provider: 'email'
           }),
-        })
+        });
 
-        if (response.ok) {
-          window.location.href = '/home'
+        if (syncResponse.ok) {
+          const syncData = await syncResponse.json();
+          const userRole = syncData.user?.role || 'member';
+
+          if (userRole === 'admin') {
+            window.location.href = '/admin/home';
+          } else if (userRole === 'staff') {
+            window.location.href = '/staff/home';
+          } else {
+            window.location.href = '/home';
+          }
         } else {
-          setError('Failed to sync session with server')
-          setIsLoading(false)
+          setError('Failed to sync session with server');
+          setIsLoading(false);
         }
       } else {
-        setError('Login failed')
-        setIsLoading(false)
+        setError('Login failed');
+        setIsLoading(false);
       }
     } catch (err) {
       console.error('Login error:', err)

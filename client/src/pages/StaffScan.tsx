@@ -8,13 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
-import { 
-  Scan, 
-  CheckCircle2, 
-  Wrench, 
-  XCircle, 
+import {
+  Scan,
+  CheckCircle2,
+  Wrench,
+  XCircle,
   ArrowLeft,
   Package,
   User,
@@ -94,16 +95,17 @@ export default function StaffScan() {
   })
 
   const actionMutation = useMutation({
-    mutationFn: async ({ bookingId, action, condition }: { 
+    mutationFn: async ({ bookingId, action, condition, condition_note }: {
       bookingId: string
       action: ActionType
       condition?: string
+      condition_note?: string
     }) => {
       const endpoint = `/api/staff/bookings/${bookingId}/${action}`
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ condition })
+        body: JSON.stringify({ condition, condition_note })
       })
       if (!response.ok) {
         const error = await response.json()
@@ -142,8 +144,8 @@ export default function StaffScan() {
 
   const confirmReturn = (condition: string, note?: string) => {
     if (!scanResult) return
-    actionMutation.mutate({ 
-      bookingId: scanResult.booking.id, 
+    actionMutation.mutate({
+      bookingId: scanResult.booking.id,
       action: 'return',
       condition,
       condition_note: note
@@ -207,16 +209,16 @@ export default function StaffScan() {
 
           {isScanning ? (
             <div className="space-y-4">
-              <BarcodeScanner 
+              <BarcodeScanner
                 onScan={handleScan}
                 isScanning={isScanning && !scanMutation.isPending}
               />
               <div className="mt-4">
                 <p className="text-sm font-medium mb-2">Manual Entry</p>
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    className="flex-1 px-3 py-2 border rounded-md text-sm" 
+                  <input
+                    type="text"
+                    className="flex-1 px-3 py-2 border rounded-md text-sm"
                     placeholder="Enter booking code..."
                     onKeyDown={(e) => e.key === 'Enter' && handleScan(e.currentTarget.value)}
                   />
@@ -249,7 +251,7 @@ export default function StaffScan() {
                       <span className="text-muted-foreground">Booking ID:</span>
                     </div>
                     <span className="font-mono">{scanResult.booking.id.slice(0, 8)}...</span>
-                    
+
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Member:</span>
@@ -330,26 +332,27 @@ export default function StaffScan() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
-              <Button 
-                onClick={() => setReturnCondition('EXCELLENT')} 
+              <Button
+                onClick={() => setReturnCondition('EXCELLENT')}
                 className={`h-24 flex flex-col gap-2 ${returnCondition === 'EXCELLENT' ? 'bg-green-600' : 'bg-green-500/20 text-green-700 hover:bg-green-500/30'}`}
               >
                 <CheckCircle2 className="h-8 w-8" />
                 Excellent Condition
               </Button>
-              <Button 
-                onClick={() => setReturnCondition('BAD')} 
+              <Button
+                onClick={() => setReturnCondition('BAD')}
                 className={`h-24 flex flex-col gap-2 ${returnCondition === 'BAD' ? 'bg-red-600' : 'bg-red-500/20 text-red-700 hover:bg-red-500/30'}`}
               >
                 <AlertTriangle className="h-8 w-8" />
-                Bad Condition
+                Damaged Condition
               </Button>
             </div>
+
 
             {returnCondition === 'BAD' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Description of issues (required)</label>
-                <Textarea 
+                <Textarea
                   placeholder="Describe the issues or damage..."
                   value={returnNote}
                   onChange={(e) => setReturnNote(e.target.value)}
@@ -359,7 +362,7 @@ export default function StaffScan() {
             )}
 
             <div className="flex gap-2">
-              <Button 
+              <Button
                 className="flex-1"
                 disabled={!returnCondition || (returnCondition === 'BAD' && !returnNote)}
                 onClick={() => confirmReturn(returnCondition!, returnNote)}

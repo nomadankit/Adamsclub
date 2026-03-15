@@ -84,6 +84,7 @@ export default function AdminGear() {
         excellentTokenReward: formData.excellentTokenReward ? parseInt(formData.excellentTokenReward) : 0,
         type: formData.type,
         location: targetLocationId,
+        quantity: formData.quantity ? parseInt(formData.quantity) : 0,
         isAvailable: formData.isAvailable,
         maintenanceMode: formData.maintenanceMode,
       }
@@ -200,11 +201,11 @@ export default function AdminGear() {
   })
 
   const filteredGear = locationGear.filter((item) => {
-    const matchesSearch = 
+    const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.brand?.toLowerCase().includes(searchQuery.toLowerCase())
-    
+
     if (filterAvailable === "available") return matchesSearch && item.isAvailable && !item.maintenanceMode
     if (filterAvailable === "maintenance") return matchesSearch && item.maintenanceMode
     return matchesSearch
@@ -439,7 +440,7 @@ export default function AdminGear() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs font-semibold mb-1 block">Adventure Price ($)</label>
+                        <label className="text-xs font-semibold mb-1 block">Adventure Price (Credits)</label>
                         <Input
                           placeholder="0"
                           type="number"
@@ -460,28 +461,7 @@ export default function AdminGear() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-semibold mb-1 block">Daily Rate</label>
-                        <Input
-                          placeholder="0"
-                          type="number"
-                          step="1"
-                          value={formData.dailyRate}
-                          onChange={(e) => setFormData({ ...formData, dailyRate: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold mb-1 block">Return Credit</label>
-                        <Input
-                          placeholder="0"
-                          type="number"
-                          step="1"
-                          value={formData.depositAmount}
-                          onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
-                        />
-                      </div>
-                    </div>
+
 
                     <div>
                       <label className="text-xs font-semibold mb-1 block">Stock at {currentLocation.name}</label>
@@ -552,7 +532,7 @@ export default function AdminGear() {
                       data-testid="input-search-gear"
                     />
                   </div>
-                  
+
                   <div className="flex gap-2">
                     <Button
                       variant={filterAvailable === "all" ? "default" : "outline"}
@@ -649,12 +629,7 @@ export default function AdminGear() {
                               </div>
 
                               <div className="grid grid-cols-2 gap-2 text-sm border-t pt-3">
-                                {item.dailyRate && (
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Daily Rate</p>
-                                    <p className="font-medium">{Math.round(Number(item.dailyRate))} credits</p>
-                                  </div>
-                                )}
+
                                 {item.condition && (
                                   <div>
                                     <p className="text-xs text-muted-foreground">Condition</p>

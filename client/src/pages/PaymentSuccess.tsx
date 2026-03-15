@@ -74,6 +74,7 @@ export default function PaymentSuccess() {
             // Force refetch user data and credit history
             await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
             await queryClient.invalidateQueries({ queryKey: ['/api/credits/history'] });
+            await queryClient.invalidateQueries({ queryKey: ['availability'] });
 
             // Wait a moment for cache invalidation to propagate
             await new Promise(resolve => setTimeout(resolve, 500));

@@ -6,7 +6,7 @@ import { requireStaff, requireAdmin } from "./authMiddleware";
 import { getUserCapabilities, requirePermission } from "./rbac";
 import { z } from "zod";
 import { db } from "./db";
-import { users, bookings, BookingStatus, assets, AssetStatus, tiers, perks, tierPerks, locations, userLocations, locationInventory, userTierBenefits, adminSettings, memberships, creditTransactions, waitlist, waitlistLeads, waitlistEmails, assetScanHistory } from "@shared/schema";
+import { users, bookings, BookingStatus, assets, AssetStatus, tiers, perks, tierPerks, locations, userLocations, locationInventory, userTierBenefits, adminSettings, memberships, creditTransactions, waitlist, waitlistLeads, waitlistEmails, assetScanHistory, tokenTransactions } from "@shared/schema";
 import { createClient } from '@supabase/supabase-js';
 import { eq, and, desc, gte, lte, gt, lt, or, inArray, count, sql } from "drizzle-orm";
 import { registerStripeRoutes } from "./stripeRoutes";
@@ -68,22 +68,22 @@ async function normalizeBookingStatuses() {
       // Auto-complete active bookings that have passed their end date
       const bookingEndDate = new Date(booking.endDate);
       const bookingStartDate = new Date(booking.startDate);
-      
+
       // Safety: If status is 'active' but end date is in the past, complete it.
       if (booking.status === BookingStatus.ACTIVE && bookingEndDate < now) {
         console.log(`[STARTUP] Auto-completing overdue booking: ${booking.id} (Scheduled End: ${booking.endDate})`);
-        await db.transaction(async (tx) => {
-          await tx.update(bookings).set({ 
+        db.transaction((tx) => {
+          tx.update(bookings).set({
             status: BookingStatus.COMPLETED,
             checkedInAt: bookingEndDate,
             updatedAt: now
-          }).where(eq(bookings.id, booking.id));
-          
-          await tx.update(assets).set({ 
+          }).where(eq(bookings.id, booking.id)).run();
+
+          tx.update(assets).set({
             status: AssetStatus.AVAILABLE,
             isAvailable: true,
             updatedAt: now
-          }).where(eq(assets.id, booking.assetId));
+          }).where(eq(assets.id, booking.assetId)).run();
         });
         fixed++;
         continue;
@@ -94,7 +94,7 @@ async function normalizeBookingStatuses() {
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
       if (booking.status === BookingStatus.PENDING && bookingStartDate < twoHoursAgo) {
         console.log(`[STARTUP] Marking no-show booking: ${booking.id} (Scheduled Start: ${booking.startDate})`);
-        await db.update(bookings).set({ 
+        await db.update(bookings).set({
           status: 'no_show',
           updatedAt: now,
           cancellationReason: "No-show: Booking expired before check-out"
@@ -262,6 +262,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching credit history:", error);
       res.status(500).json({ message: "Failed to fetch credit history" });
+    }
+  });
+
+  // Token history endpoint
+  app.get('/api/member/tokens/history', isAuthenticated, async (req: any, res) => {
+    try {
+      const transactions = await storage.getTokenTransactions(req.user.id);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching token history:", error);
+      res.status(500).json({ message: "Failed to fetch token history" });
     }
   });
 
@@ -510,13 +521,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await db.transaction(async (tx) => {
-        await tx.update(bookings).set({ 
-          status: BookingStatus.ACTIVE, 
+        await tx.update(bookings).set({
+          status: BookingStatus.ACTIVE,
           checkedOutAt: new Date(),
-          checkedOutBy: req.user.id 
+          checkedOutBy: req.user.id
         }).where(eq(bookings.id, id));
-        
-        await tx.update(assets).set({ 
+
+        await tx.update(assets).set({
           status: 'active',
           isAvailable: false
         }).where(eq(assets.id, booking.assetId));
@@ -547,48 +558,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const asset = await storage.getAsset(booking.assetId);
       if (!asset) return res.status(404).json({ message: "Asset not found" });
 
-      await db.transaction(async (tx) => {
-        // 1) Update booking status to COMPLETED
-        await tx.update(bookings).set({ 
-          status: BookingStatus.COMPLETED, 
-          checkedInAt: new Date(),
-          checkedInBy: req.user.id,
-          conditionStatus: condition,
-          conditionNote: condition_note,
-          excellentTokensAwarded: condition === 'EXCELLENT' ? (asset.excellentTokenReward || 0) : 0,
-          updatedAt: new Date()
-        }).where(eq(bookings.id, id));
-        
-        // 2) If EXCELLENT, increment user.token_balance and insert transaction
-        if (condition === 'EXCELLENT' && asset.excellentTokenReward && asset.excellentTokenReward > 0) {
-          const user = await tx.select().from(users).where(eq(users.id, booking.userId)).get();
-          if (user) {
-            const currentBalance = parseInt(user.metadata?.tokenBalance || '0');
-            const newBalance = currentBalance + asset.excellentTokenReward;
-            
-            await tx.update(users).set({
-              metadata: {
-                ...(user.metadata || {}),
-                tokenBalance: newBalance.toString()
-              }
-            }).where(eq(users.id, booking.userId));
+      // 1) Update booking status to COMPLETED
+      await db.update(bookings).set({
+        status: BookingStatus.COMPLETED,
+        checkedInAt: new Date(),
+        checkedInBy: req.user.id,
+        conditionStatus: condition,
+        conditionNote: condition_note,
+        excellentTokensAwarded: condition === 'EXCELLENT' ? (asset.excellentTokenReward || 0) : 0,
+        updatedAt: new Date()
+      }).where(eq(bookings.id, id));
 
-            await tx.insert(tokenTransactions).values({
-              userId: booking.userId,
-              bookingId: id,
-              amount: asset.excellentTokenReward,
-              type: 'EARNED'
-            });
-          }
+      // 2) If EXCELLENT, increment user.token_balance and insert transaction
+      if (condition === 'EXCELLENT' && asset.excellentTokenReward && asset.excellentTokenReward > 0) {
+        const user = await db.select().from(users).where(eq(users.id, booking.userId)).get();
+        if (user) {
+          const currentBalance = parseInt(user.metadata?.tokenBalance || '0');
+          const newBalance = currentBalance + asset.excellentTokenReward;
+
+          await db.update(users).set({
+            metadata: {
+              ...(user.metadata || {}),
+              tokenBalance: newBalance.toString()
+            }
+          }).where(eq(users.id, booking.userId));
+
+          await db.insert(tokenTransactions).values({
+            userId: booking.userId,
+            bookingId: id,
+            amount: asset.excellentTokenReward,
+            type: 'EARNED'
+          });
         }
+      }
 
-        // 3) Update inventory status to AVAILABLE (or MAINTENANCE if needed)
-        await tx.update(assets).set({ 
-          status: condition === 'MAINTENANCE' ? AssetStatus.MAINTENANCE : AssetStatus.AVAILABLE,
-          isAvailable: condition !== 'MAINTENANCE',
-          updatedAt: new Date()
-        }).where(eq(assets.id, booking.assetId));
-      });
+      // 3) Update inventory status to AVAILABLE (or MAINTENANCE if needed)
+      await db.update(assets).set({
+        status: condition === 'MAINTENANCE' ? AssetStatus.MAINTENANCE : AssetStatus.AVAILABLE,
+        isAvailable: condition !== 'MAINTENANCE',
+        updatedAt: new Date()
+      }).where(eq(assets.id, booking.assetId));
 
       res.json({ ok: true, message: "Gear returned successfully" });
     } catch (error) {
@@ -1595,8 +1604,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userEmail = (req.user as any).email;
       if (userEmail !== 'ankit3765kumar@gmail.com') {
-        return res.status(403).json({ 
-          ok: false, 
+        return res.status(403).json({
+          ok: false,
           message: 'Forbidden: Only ankit3765kumar@gmail.com can use the role toggle',
           code: 'FORBIDDEN_ROLE_TOGGLE'
         });
@@ -1616,114 +1625,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get availability for a specific date
+  // Check availability for a specific date
   app.get("/api/availability", isAuthenticated, async (req: any, res) => {
     try {
       const { date, type, category } = req.query;
-
       if (!date) {
         return res.status(400).json({ message: "Date is required" });
       }
 
-      const searchDate = new Date(date);
-      if (isNaN(searchDate.getTime())) {
-        return res.status(400).json({ message: "Invalid date" });
+      const targetDate = new Date(date as string);
+      const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+
+      // 1. Get all assets of the requested type/category
+      let assetQuery = db.select().from(assets).where(eq(assets.isAvailable, true));
+
+      if (type && type !== 'all') {
+        assetQuery = db.select().from(assets).where(and(eq(assets.isAvailable, true), eq(assets.type, type as string)));
       }
 
-      // 1. Find candidate assets
-      let assetsQuery = db.select().from(assets).where(eq(assets.isAvailable, true));
-      if (type && type !== 'all') assetsQuery = assetsQuery.where(eq(assets.type, type));
-      if (category) assetsQuery = assetsQuery.where(eq(assets.category, category));
+      const allAssets = await assetQuery;
 
-      const candidateAssets = await assetsQuery;
+      // Filter by category if provided
+      const filteredAssets = category
+        ? allAssets.filter(a => a.category === category)
+        : allAssets;
 
-      // Define time slots (8:00 AM to 6:00 PM)
-      const slots = [];
-      for (let h = 8; h < 18; h++) {
-        slots.push(`${h.toString().padStart(2, '0')}:00`);
-        slots.push(`${h.toString().padStart(2, '0')}:30`);
-      }
+      const availabilityResults = [];
 
-      if (candidateAssets.length === 0) {
-        return res.json(slots.map(time => ({
-          time,
-          status: 'booked',
-          remaining: 0,
-          note: "No assets available"
-        })));
-      }
+      for (const asset of filteredAssets) {
+        // 2. Get total stock for this asset from location inventory
+        const inventoryItems = await db
+          .select()
+          .from(locationInventory)
+          .where(eq(locationInventory.assetId, asset.id));
 
-      // 2. Get existing bookings for the day
-      const startOfDay = new Date(searchDate); startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(searchDate); endOfDay.setHours(23, 59, 59, 999);
-      const assetIds = candidateAssets.map(a => a.id);
+        // Sum up quantity across all locations (or specific location if we filter by location later)
+        let totalStock = inventoryItems.reduce((sum, item) => sum + item.quantity, 0);
 
-      const existingBookings = await db.select().from(bookings)
-        .where(
-          and(
-            inArray(bookings.assetId, assetIds),
-            sql`${bookings.status} != 'cancelled'`,
+        // Fallback to asset quantity if locationInventory is not set up
+        if (totalStock === 0) totalStock = asset.quantity || 1;
+
+        if (totalStock === 0) continue; // Skip assets with no stock
+
+        // 3. Get existing bookings for this asset on the target date
+        const existingBookings = await db
+          .select()
+          .from(bookings)
+          .where(and(
+            eq(bookings.assetId, asset.id),
             or(
               and(gte(bookings.startDate, startOfDay), lte(bookings.startDate, endOfDay)),
               and(gte(bookings.endDate, startOfDay), lte(bookings.endDate, endOfDay)),
               and(lte(bookings.startDate, startOfDay), gte(bookings.endDate, endOfDay))
-            )
-          )
-        );
+            ),
+            inArray(bookings.status, [BookingStatus.PENDING, BookingStatus.ACTIVE])
+          ));
 
-      // 3. Check availability for each slot
-      const availability = slots.map(time => {
-        const [hours, mins] = time.split(':').map(Number);
-        const slotDesc = new Date(searchDate);
-        slotDesc.setHours(hours, mins, 0, 0);
+        // 4. Generate time slots (e.g., 8 AM to 8 PM)
+        const slots = [];
+        for (let hour = 8; hour < 20; hour++) {
+          const slotTime = `${hour.toString().padStart(2, '0')}:00`;
+          const slotDate = new Date(targetDate);
+          slotDate.setHours(hour, 0, 0, 0);
 
-        // Count how many assets are free at this slot start time
-        let availableCount = 0;
-        let nextFreeTime: number | null = null;
+          // Check how many bookings overlap with this hour
+          const activeBookingsCount = existingBookings.filter(b => {
+            const start = new Date(b.startDate);
+            const end = new Date(b.endDate);
+            return start <= slotDate && end > slotDate; // Exclusive end time check
+          }).length;
 
-        for (const asset of candidateAssets) {
-          const assetBookings = existingBookings.filter(b => b.assetId === asset.id);
+          const availableQuantity = Math.max(0, totalStock - activeBookingsCount);
 
-          // Check for overlapping bookings including buffer
-          // Asset is busy if slotStart is within [Start, BufferEnd)
-          const conflictingBooking = assetBookings.find(b => {
-            const start = b.startDate;
-            // Calculate buffer end specifically for this booking
-            // Use stored bufferEnd if available, else calc
-            const bufferEnd = b.bufferEnd || new Date(b.endDate.getTime() + 60 * 60 * 1000);
-
-            return slotDesc >= start && slotDesc < bufferEnd;
+          slots.push({
+            time: slotTime,
+            available: availableQuantity,
+            total: totalStock
           });
-
-          if (!conflictingBooking) {
-            availableCount++;
-          } else {
-            // track when this asset becomes free (start of next slot)
-            const bufferEnd = conflictingBooking.bufferEnd || new Date(conflictingBooking.endDate.getTime() + 60 * 60 * 1000);
-            if (nextFreeTime === null || bufferEnd.getTime() < nextFreeTime) {
-              nextFreeTime = bufferEnd.getTime();
-            }
-          }
         }
 
-        let note = "";
-        if (availableCount === 0 && nextFreeTime) {
-          const freeDate = new Date(nextFreeTime);
-          const timeStr = freeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          note = `Reserved until ${timeStr}`;
-        }
+        availabilityResults.push({
+          asset,
+          slots
+        });
+      }
 
-        return {
-          time,
-          status: availableCount > 0 ? 'available' : 'booked',
-          remaining: availableCount,
-          total: candidateAssets.length,
-          note
-        };
-      });
-
-      res.json(availability);
-
+      res.json(availabilityResults);
     } catch (error) {
       console.error("Error checking availability:", error);
       res.status(500).json({ message: "Failed to check availability" });
@@ -2350,7 +2338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select()
         .from(bookings)
         .where(and(
-          gte(bookings.startDate, today), 
+          gte(bookings.startDate, today),
           lte(bookings.startDate, tomorrow),
           inArray(bookings.status, [BookingStatus.PENDING, BookingStatus.ACTIVE])
         ));
@@ -3032,10 +3020,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Check availability for a specific date
+  app.get("/api/availability", isAuthenticated, async (req: any, res) => {
+    try {
+      const { date, type, category } = req.query;
+      if (!date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
+
+      const targetDate = new Date(date as string);
+      const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+
+      // 1. Get all assets of the requested type/category
+      let assetQuery = db.select().from(assets).where(eq(assets.isAvailable, true));
+
+      if (type) {
+        assetQuery = db.select().from(assets).where(and(eq(assets.isAvailable, true), eq(assets.type, type as string)));
+      }
+
+      const allAssets = await assetQuery;
+
+      // Filter by category if provided
+      const filteredAssets = category
+        ? allAssets.filter(a => a.category === category)
+        : allAssets;
+
+      const availabilityResults = [];
+
+      for (const asset of filteredAssets) {
+        // 2. Get total stock for this asset from location inventory
+        const inventoryItems = await db
+          .select()
+          .from(locationInventory)
+          .where(eq(locationInventory.assetId, asset.id));
+
+        // Sum up quantity across all locations (or specific location if we filter by location later)
+        const totalStock = inventoryItems.reduce((sum, item) => sum + item.quantity, 0);
+
+        if (totalStock === 0) continue; // Skip assets with no stock
+
+        // 3. Get existing bookings for this asset on the target date
+        const existingBookings = await db
+          .select()
+          .from(bookings)
+          .where(and(
+            eq(bookings.assetId, asset.id),
+            or(
+              and(gte(bookings.startDate, startOfDay), lte(bookings.startDate, endOfDay)),
+              and(gte(bookings.endDate, startOfDay), lte(bookings.endDate, endOfDay)),
+              and(lte(bookings.startDate, startOfDay), gte(bookings.endDate, endOfDay))
+            ),
+            inArray(bookings.status, [BookingStatus.PENDING, BookingStatus.ACTIVE])
+          ));
+
+        // 4. Generate time slots (e.g., 8 AM to 8 PM)
+        const slots = [];
+        for (let hour = 8; hour < 20; hour++) {
+          const slotTime = `${hour.toString().padStart(2, '0')}:00`;
+          const slotDate = new Date(targetDate);
+          slotDate.setHours(hour, 0, 0, 0);
+
+          // Check how many bookings overlap with this hour
+          const activeBookingsCount = existingBookings.filter(b => {
+            const start = new Date(b.startDate);
+            const end = new Date(b.endDate);
+            return start <= slotDate && end > slotDate; // Exclusive end time check
+          }).length;
+
+          const availableQuantity = Math.max(0, totalStock - activeBookingsCount);
+
+          slots.push({
+            time: slotTime,
+            available: availableQuantity,
+            total: totalStock
+          });
+        }
+
+        availabilityResults.push({
+          asset,
+          slots
+        });
+      }
+
+      res.json(availabilityResults);
+    } catch (error) {
+      console.error("Error checking availability:", error);
+      res.status(500).json({ message: "Failed to check availability" });
+    }
+  });
+
   // Create asset
   app.post("/api/assets", requireAdmin, async (req: any, res) => {
     try {
-      const { name, description, type, category, brand, model, condition, dailyRate, depositAmount, creditPrice, location, quantity, isAvailable, maintenanceMode } = req.body;
+      const { name, description, type, category, brand, model, condition, dailyRate, depositAmount, creditPrice, mainPrice, excellentTokenReward, location, quantity, isAvailable, maintenanceMode } = req.body;
       if (!name) {
         return res.status(400).json({ message: "Name is required" });
       }
@@ -3050,6 +3129,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dailyRate: dailyRate ? parseFloat(dailyRate) : null,
         depositAmount: depositAmount ? parseFloat(depositAmount) : null,
         creditPrice: creditPrice ? parseFloat(creditPrice) : null,
+        mainPrice: mainPrice ? parseFloat(mainPrice) : null,
+        excellentTokenReward: excellentTokenReward ? parseInt(excellentTokenReward) : 0,
         location,
         isAvailable: isAvailable ?? true,
         maintenanceMode: maintenanceMode ?? false,
@@ -3077,7 +3158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/assets/:id", requireAdmin, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { name, description, type, category, brand, model, condition, dailyRate, depositAmount, creditPrice, location, isAvailable, maintenanceMode } = req.body;
+      const { name, description, type, category, brand, model, condition, dailyRate, depositAmount, creditPrice, mainPrice, excellentTokenReward, location, quantity, isAvailable, maintenanceMode } = req.body;
       const updatedAsset = await db.update(assets).set({
         name,
         description,
@@ -3089,10 +3170,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dailyRate: dailyRate ? parseFloat(dailyRate) : null,
         depositAmount: depositAmount ? parseFloat(depositAmount) : null,
         creditPrice: creditPrice ? parseFloat(creditPrice) : null,
+        mainPrice: mainPrice ? parseFloat(mainPrice) : null,
+        excellentTokenReward: excellentTokenReward ? parseInt(excellentTokenReward) : 0,
         location,
         isAvailable,
         maintenanceMode,
       }).where(eq(assets.id, id)).returning();
+
+      // Update location inventory if location and quantity are provided
+      if (location && quantity !== undefined) {
+        const qty = parseInt(quantity);
+
+        // Try to update existing inventory
+        const updatedInventory = await db
+          .update(locationInventory)
+          .set({ quantity: qty, updatedAt: new Date() })
+          .where(and(
+            eq(locationInventory.assetId, id),
+            eq(locationInventory.locationId, location)
+          ))
+          .returning();
+
+        // If no existing inventory, create it
+        if (updatedInventory.length === 0) {
+          await db.insert(locationInventory).values({
+            locationId: location,
+            assetId: id,
+            quantity: qty,
+            creditPrice: creditPrice ? parseFloat(creditPrice) : null,
+          });
+        }
+      }
       if (updatedAsset.length === 0) {
         return res.status(404).json({ message: "Asset not found" });
       }

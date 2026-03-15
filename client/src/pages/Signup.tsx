@@ -40,30 +40,54 @@ export default function Signup() {
     setIsLoading(true)
 
     try {
-      // Use backend signup directly to bypass Supabase email verification for testing
-      const response = await fetch('/api/auth/signup/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: signupData.email,
-          password: signupData.password,
-          firstName: signupData.firstName,
-          lastName: signupData.lastName
-        })
+      const { supabase } = await import('@/lib/supabase');
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: signupData.email,
+        password: signupData.password,
+        options: {
+          data: {
+            first_name: signupData.firstName,
+            last_name: signupData.lastName,
+          }
+        }
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast({
-          title: "Account created!",
-          description: "You have been successfully signed up and logged in.",
-        });
-        // Redirect to account page directly since we're logged in
-        setTimeout(() => setLocation('/account'), 1000);
-      } else {
-        setError(data.message || 'Signup failed');
+      if (signUpError) {
+        setError(signUpError.message || 'Signup failed');
         setIsLoading(false);
+        return;
+      }
+
+      if (data.session) {
+        // Sync session with backend to maintain HTTP-only cookie session
+        const syncResponse = await fetch('/api/auth/supabase/callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+            user: data.user,
+            provider: 'email'
+          }),
+        });
+
+        if (syncResponse.ok) {
+          toast({
+            title: "Account created!",
+            description: "You have been successfully signed up and logged in.",
+          });
+          setTimeout(() => setLocation('/home'), 1000);
+        } else {
+          setError('Failed to sync session with server');
+          setIsLoading(false);
+        }
+      } else {
+        toast({
+          title: "Check your email",
+          description: "We sent a confirmation link to your email address.",
+        });
+        setIsLoading(false);
+        setTimeout(() => setLocation('/login'), 3000);
       }
     } catch (err) {
       console.error('Signup error:', err);

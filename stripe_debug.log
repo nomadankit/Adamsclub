@@ -1,0 +1,302 @@
+[2026-02-05T19:47:21.645Z] 📥 SYNC-PAYMENT ENDPOINT HIT {
+  "body": {
+    "sessionId": "cs_test_a1PSlqLtPIBWixyPXaRMk2TiEOIkEFblQB6puzDmQjOqEtq9kKEhkSmhLy"
+  }
+}
+[2026-02-05T19:47:21.647Z] 🔄 Sync request received {
+  "sessionId": "cs_test_a1PSlqLtPIBWixyPXaRMk2TiEOIkEFblQB6puzDmQjOqEtq9kKEhkSmhLy",
+  "authenticatedUserId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c"
+}
+[2026-02-05T19:47:22.003Z] Session details retrieved {
+  "sessionId": "cs_test_a1PSlqLtPIBWixyPXaRMk2TiEOIkEFblQB6puzDmQjOqEtq9kKEhkSmhLy",
+  "clientReferenceId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "authenticatedUserId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "paymentStatus": "paid",
+  "metadata": {
+    "planType": "base-explorer",
+    "type": "subscription",
+    "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c"
+  }
+}
+[2026-02-05T19:47:22.005Z] Session payment status check {
+  "status": "complete",
+  "payment_status": "paid"
+}
+[2026-02-05T19:47:22.006Z] ✅ Payment is PAID, calling handleSuccessfulPayment 
+[2026-02-05T19:47:22.010Z] Processing subscription upgrade {
+  "planType": "base-explorer"
+}
+[2026-02-05T19:47:22.061Z] ✅ Subscription credits granted {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsToGrant": 71,
+  "planType": "base-explorer"
+}
+[2026-02-05T19:47:22.070Z] ✅ Sync complete {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsBalance": "71.00"
+}
+[2026-02-16T09:25:25.360Z] Creating credits checkout {
+  "packageId": "popular",
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "body": {
+    "packageId": "popular",
+    "amount": 39.99,
+    "price": 39.99,
+    "credits": 250,
+    "priceId": "price_1SBLLJD0boAhB99c9NmfL6Ts"
+  }
+}
+[2026-02-16T09:25:42.610Z] Processing CREDITS purchase {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "credits": "250"
+}
+[2026-02-16T09:25:42.611Z] Balance BEFORE credit addition {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "balanceBefore": "71.00"
+}
+[2026-02-16T09:25:42.611Z] Calling storage.addCredits {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "credits": 250,
+  "paymentIntentId": "pi_3T1O3kD0boAhB99c1UkfQ3qg"
+}
+[2026-02-16T09:25:42.673Z] ✅ SUCCESS - Credits added {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsAdded": 250,
+  "balanceBefore": "71.00",
+  "balanceAfter": "321.00",
+  "transactionId": "164e91c1-6fb3-4dd0-addd-256fa7adb340"
+}
+[2026-02-16T09:27:40.250Z] Creating credits checkout {
+  "packageId": "popular",
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "body": {
+    "packageId": "popular",
+    "amount": 39.99,
+    "price": 39.99,
+    "credits": 250,
+    "priceId": "price_1SBLLJD0boAhB99c9NmfL6Ts"
+  }
+}
+[2026-02-16T09:28:06.877Z] Processing CREDITS purchase {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "credits": "250"
+}
+[2026-02-16T09:28:06.884Z] Balance BEFORE credit addition {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "balanceBefore": "321.00"
+}
+[2026-02-16T09:28:06.885Z] Calling storage.addCredits {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "credits": 250,
+  "paymentIntentId": "pi_3T1O65D0boAhB99c0pqbnVnt"
+}
+[2026-02-16T09:28:06.959Z] ✅ SUCCESS - Credits added {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsAdded": 250,
+  "balanceBefore": "321.00",
+  "balanceAfter": "571.00",
+  "transactionId": "df2276ba-ff03-48f1-a756-a614822a7203"
+}
+[2026-02-16T09:35:14.567Z] Creating credits checkout {
+  "packageId": "popular",
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "body": {
+    "packageId": "popular",
+    "amount": 39.99,
+    "price": 39.99,
+    "credits": 250,
+    "priceId": "price_1SBLLJD0boAhB99c9NmfL6Ts"
+  }
+}
+[2026-02-16T09:35:37.393Z] Processing CREDITS purchase {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "credits": "250"
+}
+[2026-02-16T09:35:37.394Z] Balance BEFORE credit addition {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "balanceBefore": "571.00"
+}
+[2026-02-16T09:35:37.395Z] Calling storage.addCredits {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "credits": 250,
+  "paymentIntentId": "pi_3T1ODKD0boAhB99c14Az7yy2"
+}
+[2026-02-16T09:35:37.458Z] ✅ SUCCESS - Credits added {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsAdded": 250,
+  "balanceBefore": "571.00",
+  "balanceAfter": "821.00",
+  "transactionId": "057b5eae-4811-45c0-9f00-2a461a0a30bb"
+}
+[2026-02-16T09:35:48.043Z] 📥 SYNC-PAYMENT ENDPOINT HIT {
+  "body": {
+    "sessionId": "cs_test_a1UxBn9T7Hm3yNr0d6sc2o8JaPSl5YxFSTeh7vZAtfzSH22k8Yp3RQapSh"
+  }
+}
+[2026-02-16T09:35:48.043Z] 🔄 Sync request received {
+  "sessionId": "cs_test_a1UxBn9T7Hm3yNr0d6sc2o8JaPSl5YxFSTeh7vZAtfzSH22k8Yp3RQapSh",
+  "authenticatedUserId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c"
+}
+[2026-02-16T09:35:48.242Z] Session details retrieved {
+  "sessionId": "cs_test_a1UxBn9T7Hm3yNr0d6sc2o8JaPSl5YxFSTeh7vZAtfzSH22k8Yp3RQapSh",
+  "clientReferenceId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "authenticatedUserId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "paymentStatus": "paid",
+  "metadata": {
+    "credits": "250",
+    "packageId": "popular",
+    "type": "credits",
+    "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c"
+  }
+}
+[2026-02-16T09:35:48.242Z] Session payment status check {
+  "status": "complete",
+  "payment_status": "paid"
+}
+[2026-02-16T09:35:48.242Z] ✅ Payment is PAID, calling handleSuccessfulPayment 
+[2026-02-16T09:35:48.242Z] Processing CREDITS purchase {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "credits": "250"
+}
+[2026-02-16T09:35:48.243Z] ⚠️ ALREADY PROCESSED - Idempotent check passed {
+  "paymentIntentId": "pi_3T1ODKD0boAhB99c14Az7yy2"
+}
+[2026-02-16T09:35:48.244Z] ✅ Sync complete {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsBalance": "821.00"
+}
+[2026-02-22T13:42:55.598Z] 📥 SYNC-PAYMENT ENDPOINT HIT {
+  "body": {
+    "sessionId": "cs_test_a1CHnljqx7eQ9GgV2n9lrTEhzMphFYyp64snw4IEBgy42O5mv4aCfxE0jF"
+  }
+}
+[2026-02-22T13:42:55.601Z] 🔄 Sync request received {
+  "sessionId": "cs_test_a1CHnljqx7eQ9GgV2n9lrTEhzMphFYyp64snw4IEBgy42O5mv4aCfxE0jF",
+  "authenticatedUserId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96"
+}
+[2026-02-22T13:42:55.974Z] Session details retrieved {
+  "sessionId": "cs_test_a1CHnljqx7eQ9GgV2n9lrTEhzMphFYyp64snw4IEBgy42O5mv4aCfxE0jF",
+  "clientReferenceId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "authenticatedUserId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "paymentStatus": "paid",
+  "metadata": {
+    "planType": "base-explorer",
+    "type": "subscription",
+    "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96"
+  }
+}
+[2026-02-22T13:42:55.975Z] Session payment status check {
+  "status": "complete",
+  "payment_status": "paid"
+}
+[2026-02-22T13:42:55.976Z] ✅ Payment is PAID, calling handleSuccessfulPayment 
+[2026-02-22T13:42:55.980Z] Processing subscription upgrade {
+  "planType": "base-explorer"
+}
+[2026-02-22T13:42:56.031Z] ✅ Subscription credits granted {
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "creditsToGrant": 71,
+  "planType": "base-explorer"
+}
+[2026-02-22T13:42:56.033Z] ✅ Sync complete {
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "creditsBalance": "71.00"
+}
+[2026-02-22T13:48:55.702Z] 📥 SYNC-PAYMENT ENDPOINT HIT {
+  "body": {
+    "sessionId": "cs_test_a11xqDzfgYUbP9QlZsJWuNu8s1RRhbkvmZqRcFEmqlqGwvdnPxPPZhUtZ7"
+  }
+}
+[2026-02-22T13:48:55.706Z] 🔄 Sync request received {
+  "sessionId": "cs_test_a11xqDzfgYUbP9QlZsJWuNu8s1RRhbkvmZqRcFEmqlqGwvdnPxPPZhUtZ7",
+  "authenticatedUserId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c"
+}
+[2026-02-22T13:48:56.104Z] Session details retrieved {
+  "sessionId": "cs_test_a11xqDzfgYUbP9QlZsJWuNu8s1RRhbkvmZqRcFEmqlqGwvdnPxPPZhUtZ7",
+  "clientReferenceId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "authenticatedUserId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "paymentStatus": "paid",
+  "metadata": {
+    "planType": "base-explorer",
+    "type": "subscription",
+    "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c"
+  }
+}
+[2026-02-22T13:48:56.106Z] Session payment status check {
+  "status": "complete",
+  "payment_status": "paid"
+}
+[2026-02-22T13:48:56.107Z] ✅ Payment is PAID, calling handleSuccessfulPayment 
+[2026-02-22T13:48:56.109Z] Processing subscription upgrade {
+  "planType": "base-explorer"
+}
+[2026-02-22T13:48:56.157Z] ✅ Subscription credits granted {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsToGrant": 71,
+  "planType": "base-explorer"
+}
+[2026-02-22T13:48:56.161Z] ✅ Sync complete {
+  "userId": "55d92d02-1a59-4d70-b050-9b5d84ccf76c",
+  "creditsBalance": "71.00"
+}
+[2026-03-15T16:08:01.897Z] Creating credits checkout {
+  "packageId": "popular",
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "body": {
+    "packageId": "popular",
+    "amount": 39.99,
+    "price": 39.99,
+    "credits": 250,
+    "priceId": "price_1SBLLJD0boAhB99c9NmfL6Ts"
+  }
+}
+[2026-03-15T16:08:37.159Z] 📥 SYNC-PAYMENT ENDPOINT HIT {
+  "body": {
+    "sessionId": "cs_test_a1VLsP8l5AdpJKaO3jNpYK657ZdbP3jneVwa2Kx9TL7eo1EJe4JUQxlAiB"
+  }
+}
+[2026-03-15T16:08:37.161Z] 🔄 Sync request received {
+  "sessionId": "cs_test_a1VLsP8l5AdpJKaO3jNpYK657ZdbP3jneVwa2Kx9TL7eo1EJe4JUQxlAiB",
+  "authenticatedUserId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96"
+}
+[2026-03-15T16:08:37.498Z] Session details retrieved {
+  "sessionId": "cs_test_a1VLsP8l5AdpJKaO3jNpYK657ZdbP3jneVwa2Kx9TL7eo1EJe4JUQxlAiB",
+  "clientReferenceId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "authenticatedUserId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "paymentStatus": "paid",
+  "metadata": {
+    "credits": "250",
+    "packageId": "popular",
+    "type": "credits",
+    "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96"
+  }
+}
+[2026-03-15T16:08:37.499Z] Session payment status check {
+  "status": "complete",
+  "payment_status": "paid"
+}
+[2026-03-15T16:08:37.500Z] ✅ Payment is PAID, calling handleSuccessfulPayment 
+[2026-03-15T16:08:37.504Z] Processing CREDITS purchase {
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "credits": "250"
+}
+[2026-03-15T16:08:37.509Z] Balance BEFORE credit addition {
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "balanceBefore": "71.00"
+}
+[2026-03-15T16:08:37.511Z] Calling storage.addCredits {
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "credits": 250,
+  "paymentIntentId": "pi_3TBHD9D0boAhB99c0RNnTASi"
+}
+[2026-03-15T16:08:37.530Z] ✅ SUCCESS - Credits added {
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "creditsAdded": 250,
+  "balanceBefore": "71.00",
+  "balanceAfter": "321.00",
+  "transactionId": "92d29975-6a51-4aa2-a9d8-5e74e7fee4fe"
+}
+[2026-03-15T16:08:37.548Z] ✅ Sync complete {
+  "userId": "ad2c4d77-b73c-4b3b-a6e9-16a57756ba96",
+  "creditsBalance": "321.00"
+}

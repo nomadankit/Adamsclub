@@ -16,6 +16,7 @@ import { useLocation } from "wouter"
 import { useToast } from "@/hooks/use-toast"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import QRCodeGenerator from 'qrcode'
+import { useAuth } from "@/hooks/useAuth"
 
 type BookingStatus = 'pending' | 'active' | 'completed' | 'cancelled'
 type BookingType = 'kayak' | 'camping' | 'bike' | 'hiking'
@@ -39,10 +40,12 @@ interface Booking {
 }
 
 export default function Bookings() {
+  const { user } = useAuth()
   const [, setLocation] = useLocation()
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [showQRModal, setShowQRModal] = useState(false)
+  const [qrCodeUrl, setQrCodeUrl] = useState('')
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [activeTab, setActiveTab] = useState<BookingStatus>('pending')
   const [searchQuery, setSearchQuery] = useState('')
@@ -50,71 +53,82 @@ export default function Bookings() {
   const [bookingStep, setBookingStep] = useState<'select' | 'details' | 'confirm'>('select')
   const [selectedBenefit, setSelectedBenefit] = useState<any>(null)
   const [bookingInProgress, setBookingInProgress] = useState(false)
+
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [bookingDetails, setBookingDetails] = useState({
-    date: '',
+    date: new Date().toISOString().split('T')[0],
     time: '',
     location: '',
     duration: '1'
   })
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('')
-  const [availabilitySlots, setAvailabilitySlots] = useState<any[]>([])
 
-  useEffect(() => {
-    if (bookingDetails.date && selectedBenefit) {
-      const fetchAvailability = async () => {
-        try {
-          const type = selectedBenefit.id.includes('kayak') ? 'gear' : 'gear'; // simplify type mapping
-          const category = selectedBenefit.type === 'kayak' ? 'Water Sports' : undefined;
-
-          const params = new URLSearchParams({
-            date: bookingDetails.date,
-            type: 'gear', // Assuming assets are searchable by type 'gear' for now
-            // category: category // Optional: refine if needed
-          });
-
-          const res = await fetch(`/api/availability?${params}`);
-          if (res.ok) {
-            const data = await res.json();
-            // Filter out past time slots if the selected date is today
-            const now = new Date();
-            const selectedDate = new Date(bookingDetails.date);
-            const isToday = selectedDate.toDateString() === now.toDateString();
-
-            if (isToday) {
-              const currentHour = now.getHours();
-              const currentMinute = now.getMinutes();
-              const filteredData = data.filter((slot: any) => {
-                const [hour, minute] = slot.time.split(':').map(Number);
-                if (hour > currentHour) return true;
-                if (hour === currentHour && minute > currentMinute) return true;
-                return false;
-              });
-              setAvailabilitySlots(filteredData);
-            } else {
-              setAvailabilitySlots(data);
-            }
-          }
-        } catch (e) {
-          console.error("Failed to fetch availability", e);
-        }
-      };
-      fetchAvailability();
+  // Fetch available assets/benefits
+  const { data: availableAssets = [], isLoading: isLoadingAssets } = useQuery({
+    queryKey: ['availability', bookingDetails.date],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        date: bookingDetails.date,
+        type: filterType === 'all' ? '' : filterType
+      });
+      const res = await fetch(`/api/availability?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch availability');
+      return res.json();
     }
-  }, [bookingDetails.date, selectedBenefit]);
+  });
 
-  const formatTime = (time: string) => {
-    const [h, m] = time.split(':').map(Number);
-    const amp = h >= 12 ? 'PM' : 'AM';
-    const hour = h % 12 || 12;
-    return `${hour}:${m.toString().padStart(2, '0')} ${amp}`;
+  const { data: apiBookings = [], isLoading: isLoadingBookings } = useQuery({
+    queryKey: ['bookings'],
+    queryFn: async () => {
+      const res = await fetch('/api/bookings');
+      if (!res.ok) throw new Error('Failed to fetch bookings');
+      return res.json();
+    }
+  });
+
+  const handleNewBooking = () => {
+    setBookingStep('select');
+    setSelectedBenefit(null);
+    setShowBookingModal(true);
   };
 
-  const getEndTimeOptions = () => {
-    if (!bookingDetails.time || availabilitySlots.length === 0) return [];
+  const getAvailableTimeSlots = () => {
+    if (!selectedBenefit) return [];
 
-    // Generate 30m, 1h, 1.5h, 2h options
-    // Check conflicts for each duration
-    // A duration is valid if ALL slots from Start to End are available
+    // Find the availability data for the selected asset
+    const assetAvailability = availableAssets.find((a: any) => a.asset.id === selectedBenefit.id);
+    if (!assetAvailability) return [];
+
+    const now = new Date();
+    const isToday = new Date(bookingDetails.date).toDateString() === now.toDateString();
+
+    return assetAvailability.slots.map((slot: any) => {
+      // Parse slot time
+      const [h, m] = slot.time.split(':').map(Number);
+
+      // Check if time is in past (if today)
+      let isDisabled = false;
+      if (isToday) {
+        if (h < now.getHours() || (h === now.getHours() && m < now.getMinutes())) {
+          isDisabled = true;
+        }
+      }
+
+      // Check stock availability
+      if (slot.available <= 0) {
+        isDisabled = true;
+      }
+
+      return {
+        ...slot,
+        disabled: isDisabled
+      };
+    });
+  };
+
+  const timeSlots = getAvailableTimeSlots();
+
+  const getEndTimeOptions = () => {
+    if (!bookingDetails.time || timeSlots.length === 0) return [];
 
     const options = [
       { label: '30 min', value: '0.5' },
@@ -126,234 +140,101 @@ export default function Bookings() {
       { label: 'Full Day', value: '8' }
     ];
 
-    const startIndex = availabilitySlots.findIndex(s => s.time === bookingDetails.time);
+    const startIndex = timeSlots.findIndex((s: any) => s.time === bookingDetails.time);
     if (startIndex === -1) return [];
 
     return options.map(opt => {
       const hours = parseFloat(opt.value);
-      const slotsNeeded = Math.ceil(hours * 2); // 30 min slots
+      const slotsNeeded = Math.ceil(hours * 2);
 
       let disabled = false;
-      // Check if we run out of day or hit a booked slot
       for (let i = 0; i < slotsNeeded; i++) {
         const slotIndex = startIndex + i;
-        if (slotIndex >= availabilitySlots.length) {
-          // disabled = true; // Can't go past closing time? Assuming yes.
-          // Usually Full Day just means until close.
-          break;
+        if (slotIndex >= timeSlots.length) {
+          // allow if it fits within day roughly, or break
         }
-        if (availabilitySlots[slotIndex].status === 'booked') {
+        if (timeSlots[slotIndex] && timeSlots[slotIndex].disabled) {
           disabled = true;
           break;
         }
       }
-
       return { ...opt, disabled };
     });
   };
 
-  const generateQRCode = async (data: string) => {
-    try {
-      const url = await QRCodeGenerator.toDataURL(data, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      })
-      return url
-    } catch (error) {
-      console.error('Error generating QR code:', error)
-      return ''
+  // Helper to map assets to benefit UI model
+  const mapAssetToBenefit = (assetData: any) => {
+    if (!assetData || !assetData.asset) return null;
+    const asset = assetData.asset;
+    const typeMap: Record<string, string> = {
+      'kayak': 'kayak',
+      'camping': 'camping',
+      'bike': 'bike',
+      'hiking': 'hiking'
+    };
+
+    const iconMap: Record<string, any> = {
+      'kayak': '🌊',
+      'camping': '⛺',
+      'bike': '🚲',
+      'hiking': '⛰️'
+    };
+
+    let type = typeMap[asset.type];
+    if (!type) {
+      const category = (asset.category || '').toLowerCase();
+      if (category.includes('bike')) type = 'bike';
+      else if (category.includes('camp')) type = 'camping';
+      else if (category.includes('water') || category.includes('kayak') || category.includes('board')) type = 'kayak';
+      else if (category.includes('hike') || category.includes('backpack')) type = 'hiking';
+      else type = 'kayak';
     }
-  }
 
-  const handleNewBooking = () => {
-    setShowBookingModal(true)
-    setBookingStep('select')
-  }
+    // Calculate total remaining stock for the day (min of all slots? or max?)
+    // Actually, "remaining" in the card usually means "can I book it at all today?"
+    // Let's use the max available across all slots as "remaining capacity" perception
+    const maxAvailable = Math.max(...assetData.slots.map((s: any) => s.available));
+    const totalStock = assetData.slots[0]?.total || 0;
 
-  const handleSelectBenefit = (benefit: any) => {
-    if (benefit.remaining > 0) {
-      setSelectedBenefit(benefit)
-      setBookingStep('details')
-    }
-  }
+    return {
+      id: asset.id,
+      title: asset.name,
+      description: asset.description ? asset.description : (asset.brand && asset.model ? `${asset.brand} ${asset.model}` : 'Standard Gear'),
+      duration: 'Full day', // Default
+      remaining: maxAvailable,
+      total: totalStock,
+      icon: iconMap[type] || '📦',
+      creditCost: asset.creditPrice || asset.mainPrice || 0, // Fallback to mainPrice if creditPrice missing
+      type: type as BookingType,
+      popular: asset.condition === 'new' // Just a dummy heuristic
+    };
+  };
 
-  const handleBookBenefit = (benefitId: string) => {
-    console.log(`Booking benefit: ${benefitId}`)
-    setShowBookingModal(false)
-  }
+  const membershipBenefits = (Array.isArray(availableAssets) ? availableAssets : [])
+    .map(mapAssetToBenefit)
+    .filter(Boolean)
+    .filter((benefit) => {
+      if (!benefit) return false;
+      const plan = (user as any)?.subscriptionPlan;
 
-  const handleProceedToConfirm = () => {
-    if (bookingDetails.date && bookingDetails.time && bookingDetails.location) {
-      setBookingStep('confirm')
-    }
-  }
-
-  const { toast } = useToast()
-  const queryClient = useQueryClient()
-
-  // Fetch bookings from API
-  const { data: apiBookings = [], isLoading } = useQuery({
-    queryKey: ['bookings'],
-    queryFn: async () => {
-      const response = await fetch('/api/bookings', {
-        credentials: 'include'
-      })
-      if (!response.ok) throw new Error('Failed to fetch bookings')
-      return response.json()
-    }
-  })
-
-  // Create booking mutation
-  const createBookingMutation = useMutation({
-    mutationFn: async (bookingData: any) => {
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(bookingData)
-      })
-      const result = await response.json()
-      if (!response.ok || result.ok === false) {
-        throw new Error(result.message || 'Failed to create booking')
+      // Default fallback logic, if they are staff or admin map to VIP or let them see all
+      if ((user as any)?.role === 'admin' || (user as any)?.role === 'staff') {
+        return true;
       }
-      return result
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] })
-      queryClient.invalidateQueries({ queryKey: ['credits'] })
-      toast({
-        title: "Booking confirmed!",
-        description: "Your booking has been successfully created.",
-      })
-      setShowBookingModal(false)
-      setBookingStep('select')
-      setSelectedBenefit(null)
-      setBookingDetails({ date: '', time: '', location: '', duration: '1' })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Booking failed",
-        description: error.message || "There was an error creating your booking. Please try again.",
-        variant: "destructive"
-      })
-    }
-  })
 
-  // Cancel booking mutation
-  const cancelBookingMutation = useMutation({
-    mutationFn: async (bookingId: string) => {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      })
-      if (!response.ok) {
-        let errorMessage = 'Failed to cancel booking'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.message || errorMessage
-        } catch {
-          try {
-            errorMessage = await response.text() || errorMessage
-          } catch {
-          }
-        }
-        throw new Error(errorMessage)
+      if (!plan) return false;
+
+      const normalizedPlan = plan.toLowerCase();
+
+      if (normalizedPlan === 'base-explorer' || normalizedPlan === 'base') {
+        return ['bike', 'camping'].includes(benefit.type);
+      } else if (normalizedPlan === 'premium-adventurer' || normalizedPlan === 'premium') {
+        return ['bike', 'camping', 'kayak'].includes(benefit.type);
+      } else if (normalizedPlan === 'vip-pathfinder' || normalizedPlan === 'vip' || normalizedPlan === 'employee') {
+        return true;
       }
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] })
-      toast({
-        title: "Booking cancelled",
-        description: "Your booking has been successfully cancelled.",
-      })
-      setShowDetailsModal(false)
-    },
-    onError: (error) => {
-      toast({
-        title: "Cancellation failed",
-        description: "There was an error cancelling your booking. Please try again.",
-        variant: "destructive"
-      })
-    }
-  })
-
-  const handleConfirmBooking = async () => {
-    if (!selectedBenefit) return
-
-    setBookingInProgress(true)
-    try {
-      await createBookingMutation.mutateAsync({
-        benefitId: selectedBenefit.id,
-        benefitTitle: selectedBenefit.title,
-        benefitIcon: selectedBenefit.icon,
-        date: bookingDetails.date,
-        time: bookingDetails.time,
-        location: bookingDetails.location,
-        type: selectedBenefit.type,
-        duration: selectedBenefit.duration,
-        creditCost: selectedBenefit.creditCost
-      })
-    } finally {
-      setBookingInProgress(false)
-    }
-  }
-
-  // Mock membership benefits data
-  const membershipBenefits = [
-    {
-      id: 'kayak-premium',
-      title: 'Premium Kayak',
-      description: 'Single or tandem kayak rental',
-      duration: 'Full day',
-      remaining: 3,
-      total: 5,
-      icon: '🌊',
-      creditCost: 20,
-      type: 'kayak' as BookingType,
-      popular: true
-    },
-    {
-      id: 'camping-kit',
-      title: 'Camping Equipment Kit',
-      description: '4-person tent, sleeping bags, camping gear',
-      duration: '3 days',
-      remaining: 2,
-      total: 2,
-      icon: '⛺',
-      creditCost: 25,
-      type: 'camping' as BookingType,
-      popular: false
-    },
-    {
-      id: 'mountain-bike',
-      title: 'Mountain Bike',
-      description: 'Trail-ready mountain bike rental',
-      duration: 'Full day',
-      remaining: 1,
-      total: 3,
-      icon: '🚲',
-      creditCost: 15,
-      type: 'bike' as BookingType,
-      popular: false
-    },
-    {
-      id: 'hiking-gear',
-      title: 'Hiking Gear Package',
-      description: 'Backpack, boots, poles, navigation',
-      duration: '2 days',
-      remaining: 2,
-      total: 3,
-      icon: '⛰️',
-      creditCost: 10,
-      type: 'hiking' as BookingType,
-      popular: false
-    }
-  ]
+      return false;
+    });
 
   // Use real bookings from API
   const mockBookings: Booking[] = apiBookings
@@ -398,7 +279,7 @@ export default function Bookings() {
       // Robust status matching
       const currentStatus = b.status?.toLowerCase();
       const targetStatus = activeTab?.toLowerCase();
-      
+
       if (currentStatus !== targetStatus) return false;
 
       // For "Upcoming" (pending) tab, only show future bookings
@@ -408,7 +289,7 @@ export default function Bookings() {
         bookingDate.setHours(hours, minutes, 0, 0);
         return bookingDate > new Date();
       }
-      
+
       // For "Active" tab, double check if it should have been completed by now (frontend safety)
       if (activeTab === 'active') {
         const bookingDate = new Date(b.date);
@@ -531,7 +412,7 @@ export default function Bookings() {
         {/* Bookings Tabs */}
         <section className="py-4">
           <div className="max-w-6xl mx-auto">
-            {isLoading ? (
+            {isLoadingBookings ? (
               <div className="text-center py-16">
                 <div className="text-muted-foreground">
                   <Package className="h-16 w-16 mx-auto mb-4 opacity-50 animate-pulse" />
@@ -570,9 +451,9 @@ export default function Bookings() {
                     ? filteredBookings
                     : status === 'cancelled'
                       ? [
-                          ...filteredBookings, 
-                          ...expiredBookings.map(b => ({ ...b, isExpired: true, notes: 'Expired (Time passed)' }))
-                        ]
+                        ...filteredBookings,
+                        ...expiredBookings.map(b => ({ ...b, isExpired: true, notes: 'Expired (Time passed)' }))
+                      ]
                       : filteredBookings;
 
                   return (
@@ -842,18 +723,17 @@ export default function Bookings() {
                         <SelectValue placeholder={bookingDetails.date ? "Select start time" : "Pick a date first"} />
                       </SelectTrigger>
                       <SelectContent className="max-h-[200px]">
-                        {availabilitySlots.map((slot) => (
+                        {timeSlots.map((slot: any) => (
                           <SelectItem
                             key={slot.time}
                             value={slot.time}
-                            disabled={slot.status === 'booked'}
-                            className={slot.status === 'booked' ? 'opacity-50' : ''}
-                            title={slot.status === 'booked' ? (slot.note || 'Reserved') : ''}
+                            disabled={slot.disabled}
+                            className={slot.disabled ? 'opacity-50' : ''}
                           >
-                            {formatTime(slot.time)} {slot.status === 'booked' ? (slot.note ? `(${slot.note})` : '(Reserved)') : ''}
+                            {formatTime(slot.time)} {slot.disabled ? '(Unavailable)' : ''}
                           </SelectItem>
                         ))}
-                        {availabilitySlots.length === 0 && bookingDetails.date && (
+                        {timeSlots.length === 0 && bookingDetails.date && (
                           <div className="p-2 text-sm text-gray-500 text-center">Loading or no slots...</div>
                         )}
                       </SelectContent>

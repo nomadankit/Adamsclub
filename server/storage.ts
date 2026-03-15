@@ -19,6 +19,7 @@ import {
   loyaltyTierAchievements,
   passwordResetTokens,
   userRoleHistory,
+  tokenTransactions,
   type User,
   type UpsertUser,
   type Membership,
@@ -79,8 +80,9 @@ export interface IStorage {
   hasUserAcceptedCurrentWaiver(userId: string): Promise<boolean>;
   recordWaiverAcceptance(userId: string, waiverId: string, ipAddress?: string, userAgent?: string): Promise<UserWaiver>;
 
-  // Adventure Credits operations
+  // Adventure Credits & Tokens operations
   getUserCredits(userId: string): Promise<string>; // Returns current credit balance as string
+  getTokenTransactions(userId: string, limit?: number): Promise<any[]>;
   addCredits(userId: string, amount: number, type: keyof typeof CreditTransactionType, description: string, relatedEntityType?: string, relatedEntityId?: string, stripePaymentIntentId?: string, processedBy?: string): Promise<CreditTransaction>;
   spendCredits(userId: string, amount: number, description: string, relatedEntityType?: string, relatedEntityId?: string): Promise<CreditTransaction>;
   getCreditTransactions(userId: string, limit?: number): Promise<CreditTransaction[]>;
@@ -404,28 +406,29 @@ export class DatabaseStorage implements IStorage {
     endDate: Date,
     excludeBookingId?: string
   ): Promise<boolean> {
-    // Buffer Logic:
-    // 1. New booking [Start, End] + New Buffer [End+1hr]
-    // 2. Existing booking [ExStart, ExEnd] + Ex Buffer [ExBufferEnd]
-    // Conflict if:
-    // - New Start falls within Existing [Start, BufferEnd]
-    // - New BufferEnd falls within Existing [Start, BufferEnd]
-    // - Existing Start falls within New [Start, BufferEnd]
+    // 1. Get total stock for this asset
+    const inventoryItems = await db
+      .select()
+      .from(locationInventory)
+      .where(eq(locationInventory.assetId, assetId));
 
-    // We treat the "Busy Time" of any booking as [Start, BufferEnd].
-    // So simply check if ranges overlap.
+    // Default to 1 if no inventory record found (backward compatibility for serialized assets)
+    // Or should it be 0? If it's a SKU, and no inventory, we have none. 
+    // But existing assets might not have inventory records yet. 
+    // Let's assume 1 if no record, but if record exists, use the sum.
+    const totalStock = inventoryItems.length > 0
+      ? inventoryItems.reduce((sum, item) => sum + item.quantity, 0)
+      : 1;
+
+    // 2. Find overlapping bookings
     const newBufferEnd = new Date(endDate.getTime() + 60 * 60 * 1000);
 
     const baseConditions = [
       eq(bookings.assetId, assetId),
-      // Check for active/confirmed bookings only? usually pending also blocks
       or(
         eq(bookings.status, 'pending'),
         eq(bookings.status, 'active')
       ),
-      // Overlap logic: (StartA < EndB) and (EndA > StartB)
-      // Here Range A = New Booking [startDate, newBufferEnd]
-      // Range B = Existing Booking [bookings.startDate, bookings.bufferEnd]
       and(
         lt(bookings.startDate, newBufferEnd),
         gt(bookings.bufferEnd, startDate)
@@ -434,17 +437,13 @@ export class DatabaseStorage implements IStorage {
 
     let query = db.select().from(bookings).where(and(...baseConditions));
 
-    // Filter out cancelled bookings explicitly if needed (redundant with the 'or' block above but safe)
-    // Actually the 'or' block above already limits statuses.
-    
     const conflicts = await query;
-    
-    // Final check for ID exclusion
-    const filteredConflicts = excludeBookingId 
+    const filteredConflicts = excludeBookingId
       ? conflicts.filter(c => c.id !== excludeBookingId)
       : conflicts;
 
-    return filteredConflicts.length > 0;
+    // 3. Conflict if overlapping count >= total stock
+    return filteredConflicts.length >= totalStock;
   }
 
   async findAvailableAsset(type: string, startDate: Date, endDate: Date): Promise<Asset | undefined> {
@@ -697,6 +696,15 @@ export class DatabaseStorage implements IStorage {
       .from(creditTransactions)
       .where(eq(creditTransactions.userId, userId))
       .orderBy(desc(creditTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async getTokenTransactions(userId: string, limit: number = 20): Promise<any[]> {
+    return await db
+      .select()
+      .from(tokenTransactions)
+      .where(eq(tokenTransactions.userId, userId))
+      .orderBy(desc(tokenTransactions.createdAt))
       .limit(limit);
   }
 

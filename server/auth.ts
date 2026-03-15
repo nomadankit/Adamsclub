@@ -96,6 +96,31 @@ export async function setupAuth(app: Express) {
     return res.status(403).json({ message: 'Public signup is disabled. Only staff and admin can create accounts. Please contact your administrator to join.' });
   });
 
+  // Dev backdoor login endpoint
+  app.get('/api/auth/dev-login/:email', async (req, res, next) => {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(404).send('Not found');
+    }
+
+    try {
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.email.toLowerCase() === req.params.email.toLowerCase());
+
+      if (!user) {
+        return res.status(404).json({ message: 'Dev user not found' });
+      }
+
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return res.status(500).json({ message: 'Login failed' });
+        }
+        res.redirect('/');
+      });
+    } catch (e) {
+      res.status(500).json({ message: 'Error in dev login' });
+    }
+  });
+
   // Login endpoint
   app.post('/api/auth/login', (req, res, next) => {
     passport.authenticate('local', (err: any, user: any, info: any) => {

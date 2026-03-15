@@ -7,7 +7,7 @@ import { ExploreGear } from "./ExploreGear"
 import { BottomNavigation } from "./BottomNavigation"
 import { Calendar, Clock, Plus, QrCode, Star, Gift, Users, Mountain, Compass, CheckCircle } from "lucide-react"
 import { useLocation } from "wouter"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import QRCodeGenerator from 'qrcode'
 import { useQueryClient, useQuery } from "@tanstack/react-query"
 
@@ -15,7 +15,7 @@ export function MemberDashboard() {
   const { user } = useAuth()
   const [, setLocation] = useLocation()
   const [showBookingModal, setShowBookingModal] = useState(false)
-  
+
   const { data: apiBookings = [], isLoading } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
@@ -265,19 +265,22 @@ export function MemberDashboard() {
 
   const [showRewardModal, setShowRewardModal] = useState(false)
   const [rewardAmount, setRewardAmount] = useState(0)
+  const lastSeenRewardRef = useRef<number | null>(null)
 
-  // Polling for recent rewards
+  // Polling for recent excellent token rewards
   useQuery({
     queryKey: ['recent-rewards'],
     queryFn: async () => {
-      const response = await fetch('/api/credits/history')
+      const response = await fetch('/api/member/tokens/history')
       if (!response.ok) return []
       const history = await response.json()
-      const fiveSecondsAgo = Date.now() - 5000
-      const recentEarned = history.find((t: any) => t.type === 'EARNED' && new Date(t.createdAt).getTime() > fiveSecondsAgo)
-      if (recentEarned) {
+      const tenSecondsAgo = Date.now() - 10000
+      const recentEarned = history.find((t: any) => t.type === 'EARNED' && new Date(t.createdAt).getTime() > tenSecondsAgo)
+
+      if (recentEarned && recentEarned.id !== lastSeenRewardRef.current) {
         setRewardAmount(parseInt(recentEarned.amount))
         setShowRewardModal(true)
+        lastSeenRewardRef.current = recentEarned.id
       }
       return history
     },
