@@ -49,6 +49,22 @@ export function useAuth() {
       console.log(`[AUTH_STATE] ${event}`, session?.user?.email);
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session) {
+          try {
+            await fetch('/api/auth/supabase/callback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+                user: session.user,
+                provider: session.user.user_metadata?.provider || 'email'
+              }),
+            });
+          } catch (e) {
+            console.error('Session sync error:', e);
+          }
+        }
         // Force refresh backend user query to sync
         await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       } else if (event === 'SIGNED_OUT') {
