@@ -4,15 +4,20 @@ import { storage } from './storage';
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
+import connectPgSimple from 'connect-pg-simple';
 import type { Express, RequestHandler } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { SQLiteStore } from './session-store';
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
 
-  const sessionStore = new SQLiteStore();
-  console.log('✅ Using persistent SQLite session store');
+  const PgSession = connectPgSimple(session);
+  const sessionStore = new PgSession({
+    conString: process.env.DATABASE_URL,
+    tableName: 'sessions',
+    createTableIfMissing: true,
+  });
+  console.log('✅ Using persistent Postgres session store');
 
   return session({
     secret: process.env.SESSION_SECRET || 'default-secret-change-this',
@@ -55,7 +60,7 @@ export async function setupAuth(app: Express) {
     async (email, password, done) => {
       try {
         const users = await storage.getAllUsers();
-        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
         if (!user) {
           return done(null, false, { message: 'Invalid email or password' });
@@ -104,7 +109,7 @@ export async function setupAuth(app: Express) {
 
     try {
       const users = await storage.getAllUsers();
-      const user = users.find(u => u.email.toLowerCase() === req.params.email.toLowerCase());
+      const user = users.find(u => u.email?.toLowerCase() === req.params.email.toLowerCase());
 
       if (!user) {
         return res.status(404).json({ message: 'Dev user not found' });

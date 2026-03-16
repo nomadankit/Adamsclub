@@ -1,18 +1,25 @@
 import { sql } from 'drizzle-orm';
-import { text, integer, sqliteTable, real } from "drizzle-orm/sqlite-core";
+import {
+  text,
+  integer,
+  boolean,
+  timestamp,
+  real,
+  pgTable,
+  serial,
+  json,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-// Session storage table - mandatory for Replit Auth
-export const sessions = sqliteTable(
-  "sessions",
-  {
-    sid: text("sid").primaryKey(),
-    sess: text("sess", { mode: "json" }).notNull(),
-    expire: integer("expire", { mode: "timestamp" }).notNull(), // SQLite stores dates as integers or text
-  }
-);
+// Session storage table
+export const sessions = pgTable("sessions", {
+  sid: text("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
 
 // User roles enum
 export const UserRole = {
@@ -66,7 +73,7 @@ export const CreditTransactionType = {
 } as const;
 
 // Users table
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text("email").unique(),
   password: text("password"),
@@ -78,33 +85,33 @@ export const users = sqliteTable("users", {
   phone: text("phone"),
   emergencyContact: text("emergency_contact"),
   emergencyPhone: text("emergency_phone"),
-  dateOfBirth: text("date_of_birth"), // Store as ISO date string
-  waiverAccepted: integer("waiver_accepted", { mode: "boolean" }).default(false),
-  waiverAcceptedAt: integer("waiver_accepted_at", { mode: "timestamp" }),
-  marketingOptIn: integer("marketing_opt_in", { mode: "boolean" }).default(false),
-  adamsCredits: text("adams_credits").default('0.00'), // Keep as text for precision
+  dateOfBirth: text("date_of_birth"),
+  waiverAccepted: boolean("waiver_accepted").default(false),
+  waiverAcceptedAt: timestamp("waiver_accepted_at"),
+  marketingOptIn: boolean("marketing_opt_in").default(false),
+  adamsCredits: text("adams_credits").default('0.00'),
   bio: text("bio"),
-  metadata: text("metadata", { mode: "json" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Memberships table
-export const memberships = sqliteTable("memberships", {
+export const memberships = pgTable("memberships", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   plan: text("plan").notNull(),
   status: text("status").default('active'),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
   stripeCustomerId: text("stripe_customer_id"),
-  currentPeriodStart: integer("current_period_start", { mode: "timestamp" }),
-  currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
-  cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const tiers = sqliteTable("tiers", {
+export const tiers = pgTable("tiers", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").unique().notNull(),
   description: text("description"),
@@ -112,26 +119,26 @@ export const tiers = sqliteTable("tiers", {
   price: real("price"),
   creditsPerMonth: integer("credits_per_month").default(0),
   monthsRequired: integer("months_required"),
-  isActive: integer("is_active", { mode: "boolean" }).default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const perks = sqliteTable("perks", {
+export const perks = pgTable("perks", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").unique().notNull(),
   description: text("description"),
   type: text("type").default(PerkType.SUBSCRIPTION),
-  isActive: integer("is_active", { mode: "boolean" }).default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const tierPerks = sqliteTable("tier_perks", {
+export const tierPerks = pgTable("tier_perks", {
   tierId: text("tier_id").notNull().references(() => tiers.id, { onDelete: 'cascade' }),
   perkId: text("perk_id").notNull().references(() => perks.id, { onDelete: 'cascade' }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-}); // Composite PK not directly supported in same syntax, standard practice relies on uniqueness logic or separate handling
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-// Asset status enum for scan actions
+// Asset status
 export const AssetStatus = {
   AVAILABLE: 'available',
   CHECKED_OUT: 'active',
@@ -139,8 +146,18 @@ export const AssetStatus = {
   OUT_OF_SERVICE: 'out_of_service'
 } as const;
 
-// Assets table (gear and experiences)
-export const assets = sqliteTable("assets", {
+// Locations table (referenced by assets)
+export const locations = pgTable("locations", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  code: text("code").unique().notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Assets table
+export const assets = pgTable("assets", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
@@ -155,212 +172,198 @@ export const assets = sqliteTable("assets", {
   dailyRate: real("daily_rate"),
   depositAmount: real("deposit_amount"),
   creditPrice: real("credit_price"),
-  mainPrice: real("main_price"), // Admin-defined adventure cost
-  excellentTokenReward: integer("excellent_token_reward").default(0), // Admin-defined token reward
-  isAddonOnly: integer("is_addon_only", { mode: "boolean" }).default(false),
+  mainPrice: real("main_price"),
+  excellentTokenReward: integer("excellent_token_reward").default(0),
+  isAddonOnly: boolean("is_addon_only").default(false),
   capacity: integer("capacity").default(1),
-  isAvailable: integer("is_available", { mode: "boolean" }).default(true),
-  maintenanceMode: integer("maintenance_mode", { mode: "boolean" }).default(false),
+  isAvailable: boolean("is_available").default(true),
+  maintenanceMode: boolean("maintenance_mode").default(false),
   currentLocationId: text("current_location_id").references(() => locations.id),
   location: text("location"),
-  tags: text("tags", { mode: "json" }), // Store array as JSON
-  lastScannedAt: integer("last_scanned_at", { mode: "timestamp" }),
+  tags: json("tags"),
+  lastScannedAt: timestamp("last_scanned_at"),
   lastScannedBy: text("last_scanned_by").references(() => users.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const assetImages = sqliteTable("asset_images", {
+export const assetImages = pgTable("asset_images", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   assetId: text("asset_id").notNull().references(() => assets.id, { onDelete: 'cascade' }),
   imageUrl: text("image_url").notNull(),
   altText: text("alt_text"),
-  isPrimary: integer("is_primary", { mode: "boolean" }).default(false),
+  isPrimary: boolean("is_primary").default(false),
   sortOrder: integer("sort_order").default(0),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const bookings = sqliteTable("bookings", {
+export const bookings = pgTable("bookings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id),
   assetId: text("asset_id").notNull().references(() => assets.id),
   status: text("status").default(BookingStatus.PENDING),
-  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
-  endDate: integer("end_date", { mode: "timestamp" }).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
   totalAmount: real("total_amount"),
   depositAmount: real("deposit_amount"),
-  depositCaptured: integer("deposit_captured", { mode: "boolean" }).default(false),
+  depositCaptured: boolean("deposit_captured").default(false),
   creditsUsed: text("credits_used").default('0.00'),
-  paidWithCredits: integer("paid_with_credits", { mode: "boolean" }).default(false),
+  paidWithCredits: boolean("paid_with_credits").default(false),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeDepositIntentId: text("stripe_deposit_intent_id"),
   qrCode: text("qr_code").unique(),
   qrToken: text("qr_token").unique(),
-  checkedOutAt: integer("checked_out_at", { mode: "timestamp" }),
+  checkedOutAt: timestamp("checked_out_at"),
   checkedOutBy: text("checked_out_by").references(() => users.id),
-  checkedInAt: integer("checked_in_at", { mode: "timestamp" }),
+  checkedInAt: timestamp("checked_in_at"),
   checkedInBy: text("checked_in_by").references(() => users.id),
-  conditionStatus: text("condition_status"), // EXCELLENT | BAD
+  conditionStatus: text("condition_status"),
   conditionNote: text("condition_note"),
   excellentTokensAwarded: integer("excellent_tokens_awarded").default(0),
   damageNotes: text("damage_notes"),
-  damagePhotos: text("damage_photos", { mode: "json" }), // Store array as JSON
+  damagePhotos: json("damage_photos"),
   cancellationReason: text("cancellation_reason"),
-  bufferEnd: integer("buffer_end_datetime", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  bufferEnd: timestamp("buffer_end_datetime"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const tokenTransactions = sqliteTable("token_transactions", {
+export const tokenTransactions = pgTable("token_transactions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id),
   bookingId: text("booking_id").references(() => bookings.id),
   amount: integer("amount").notNull(),
-  type: text("type").notNull(), // EARNED | SPENT
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  type: text("type").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const creditTransactions = sqliteTable("credit_transactions", {
+export const creditTransactions = pgTable("credit_transactions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id),
   type: text("type").notNull(),
-  amount: text("amount").notNull(), // Decimal as text in SQLite commonly
+  amount: text("amount").notNull(),
   balanceAfter: text("balance_after").notNull(),
   description: text("description").notNull(),
   relatedEntityType: text("related_entity_type"),
   relatedEntityId: text("related_entity_id"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   processedBy: text("processed_by").references(() => users.id),
-  metadata: text("metadata", { mode: "json" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const waivers = sqliteTable("waivers", {
+export const waivers = pgTable("waivers", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   version: text("version").notNull(),
   title: text("title").notNull(),
   content: text("content").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  isActive: boolean("is_active").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const userWaivers = sqliteTable("user_waivers", {
+export const userWaivers = pgTable("user_waivers", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id),
   waiverId: text("waiver_id").notNull().references(() => waivers.id),
-  acceptedAt: integer("accepted_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  acceptedAt: timestamp("accepted_at").defaultNow(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
 });
 
-export const roles = sqliteTable("roles", {
+export const roles = pgTable("roles", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").unique().notNull(),
   description: text("description"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const permissions = sqliteTable("permissions", {
+export const permissions = pgTable("permissions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").unique().notNull(),
   description: text("description"),
-  isGlobal: integer("is_global", { mode: "boolean" }).default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  isGlobal: boolean("is_global").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const rolePermissions = sqliteTable("role_permissions", {
+export const rolePermissions = pgTable("role_permissions", {
   roleId: text("role_id").notNull().references(() => roles.id, { onDelete: 'cascade' }),
   permissionId: text("permission_id").notNull().references(() => permissions.id, { onDelete: 'cascade' }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const userRoles = sqliteTable("user_roles", {
+export const userRoles = pgTable("user_roles", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   roleId: text("role_id").notNull().references(() => roles.id, { onDelete: 'cascade' }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const locations = sqliteTable("locations", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  code: text("code").unique().notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  isActive: integer("is_active", { mode: "boolean" }).default(true),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-});
-
-export const userLocations = sqliteTable("user_locations", {
+export const userLocations = pgTable("user_locations", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   locationId: text("location_id").notNull().references(() => locations.id, { onDelete: 'cascade' }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const auditLog = sqliteTable("audit_log", {
+export const auditLog = pgTable("audit_log", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").references(() => users.id),
   action: text("action").notNull(),
   entityType: text("entity_type"),
   entityId: text("entity_id"),
-  oldValues: text("old_values", { mode: "json" }),
-  newValues: text("new_values", { mode: "json" }),
+  oldValues: json("old_values"),
+  newValues: json("new_values"),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// User tier and benefit tracking
-export const userTierBenefits = sqliteTable("user_tier_benefits", {
+export const userTierBenefits = pgTable("user_tier_benefits", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   currentTierId: text("current_tier_id").notNull().references(() => tiers.id),
   tierType: text("tier_type").default(TierType.SUBSCRIPTION),
   perkId: text("perk_id").references(() => perks.id),
-  monthlyAllowance: integer("monthly_allowance").default(0), // 0 = unlimited, -1 = active/status benefit
+  monthlyAllowance: integer("monthly_allowance").default(0),
   usedThisMonth: integer("used_this_month").default(0),
-  lastResetDate: integer("last_reset_date", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  lastResetDate: timestamp("last_reset_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Loyalty tier achievements
-export const loyaltyTierAchievements = sqliteTable("loyalty_tier_achievements", {
+export const loyaltyTierAchievements = pgTable("loyalty_tier_achievements", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   tierId: text("tier_id").notNull().references(() => tiers.id),
   monthsOfSubscription: integer("months_of_subscription").notNull(),
-  achievedAt: integer("achieved_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  achievedAt: timestamp("achieved_at").defaultNow(),
 });
 
-// Location inventory table
-export const locationInventory = sqliteTable("location_inventory", {
+export const locationInventory = pgTable("location_inventory", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   locationId: text("location_id").notNull().references(() => locations.id, { onDelete: 'cascade' }),
   assetId: text("asset_id").notNull().references(() => assets.id, { onDelete: 'cascade' }),
   quantity: integer("quantity").notNull().default(0),
   creditPrice: real("credit_price").default(0.00),
   lastUpdatedBy: text("last_updated_by").references(() => users.id),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Equipment checkouts
-export const equipmentCheckouts = sqliteTable("equipment_checkouts", {
+export const equipmentCheckouts = pgTable("equipment_checkouts", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   memberId: text("member_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   locationId: text("location_id").notNull().references(() => locations.id, { onDelete: 'cascade' }),
   assetId: text("asset_id").notNull().references(() => assets.id, { onDelete: 'cascade' }),
   creditsCost: real("credits_cost").notNull(),
   issuedBy: text("issued_by").notNull().references(() => users.id),
-  issuedAt: integer("issued_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  returnDeadline: integer("return_deadline", { mode: "timestamp" }),
-  returnedAt: integer("returned_at", { mode: "timestamp" }),
+  issuedAt: timestamp("issued_at").defaultNow(),
+  returnDeadline: timestamp("return_deadline"),
+  returnedAt: timestamp("returned_at"),
   returnedBy: text("returned_by").references(() => users.id),
   condition: text("condition").default('good'),
   notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Asset scan history
-export const assetScanHistory = sqliteTable("asset_scan_history", {
+export const assetScanHistory = pgTable("asset_scan_history", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   assetId: text("asset_id").notNull().references(() => assets.id, { onDelete: 'cascade' }),
   scannedBy: text("scanned_by").notNull().references(() => users.id),
@@ -370,60 +373,56 @@ export const assetScanHistory = sqliteTable("asset_scan_history", {
   newStatus: text("new_status"),
   bookingId: text("booking_id").references(() => bookings.id),
   notes: text("notes"),
-  damageReported: integer("damage_reported", { mode: "boolean" }).default(false),
-  scannedAt: integer("scanned_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  damageReported: boolean("damage_reported").default(false),
+  scannedAt: timestamp("scanned_at").defaultNow(),
 });
 
-// Admin settings
-export const adminSettings = sqliteTable("admin_settings", {
+export const adminSettings = pgTable("admin_settings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   key: text("key").unique().notNull(),
   value: text("value").notNull(),
   description: text("description"),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type AdminSetting = typeof adminSettings.$inferSelect;
 
-// Password reset tokens table
-export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   token: text("token").notNull().unique(),
   tempPassword: text("temp_password").notNull(),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-  usedAt: integer("used_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
-// Waitlist leads table
-export const waitlistLeads = sqliteTable("waitlist_leads", {
+export const waitlistLeads = pgTable("waitlist_leads", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   firstName: text("first_name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
   location: text("location"),
-  interests: text("interests", { mode: "json" }), // JSON array
+  interests: json("interests"),
   state: text("state").notNull(),
-  optInMarketing: integer("opt_in_marketing", { mode: "boolean" }).default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  optInMarketing: boolean("opt_in_marketing").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Email tracking table
-export const waitlistEmails = sqliteTable("waitlist_emails", {
+export const waitlistEmails = pgTable("waitlist_emails", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leadId: text("lead_id").notNull().references(() => waitlistLeads.id, { onDelete: 'cascade' }),
-  emailType: text("email_type").notNull(), // main or followup
-  followupNumber: integer("followup_number").default(0), // 0 for main, 1-8 for followups
+  emailType: text("email_type").notNull(),
+  followupNumber: integer("followup_number").default(0),
   subject: text("subject"),
   content: text("content").notNull(),
   status: text("status").default('draft'),
-  sentAt: integer("sent_at", { mode: "timestamp" }),
+  sentAt: timestamp("sent_at"),
   sentBy: text("sent_by").references(() => users.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type WaitlistLead = typeof waitlistLeads.$inferSelect;
@@ -433,37 +432,35 @@ export type InsertWaitlistLead = z.infer<typeof insertWaitlistLeadSchema>;
 export const insertWaitlistEmailSchema = createInsertSchema(waitlistEmails).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertWaitlistEmail = z.infer<typeof insertWaitlistEmailSchema>;
 
-// Legacy waitlist table
-export const waitlist = sqliteTable("waitlist", {
+export const waitlist = pgTable("waitlist", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   firstName: text("first_name").notNull(),
   email: text("email").notNull().unique(),
   state: text("state").notNull(),
-  optInMarketing: integer("opt_in_marketing", { mode: "boolean" }).default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  optInMarketing: boolean("opt_in_marketing").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export type Waitlist = typeof waitlist.$inferSelect;
 export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true });
 export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;
 
-// User Role History
-export const userRoleHistory = sqliteTable("user_role_history", {
+export const userRoleHistory = pgTable("user_role_history", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   previousRole: text("previous_role"),
   newRole: text("new_role").notNull(),
   changedBy: text("changed_by").references(() => users.id),
   reason: text("reason"),
-  appliedAt: integer("applied_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`),
+  appliedAt: timestamp("applied_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export type UserRoleHistory = typeof userRoleHistory.$inferSelect;
 export const insertUserRoleHistorySchema = createInsertSchema(userRoleHistory).omit({ id: true, createdAt: true });
 export type InsertUserRoleHistory = z.infer<typeof insertUserRoleHistorySchema>;
 
-// Type exports for storage operations
+// Type exports
 export type User = typeof users.$inferSelect;
 export type UpsertUser = Partial<User>;
 export type Membership = typeof memberships.$inferSelect;
@@ -487,22 +484,18 @@ export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export const insertCreditTransactionSchema = createInsertSchema(creditTransactions).omit({ id: true, createdAt: true });
 export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
 
-// Booking schemas for validation
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type SelectBooking = typeof bookings.$inferSelect;
 
-// Inventory schemas
 export const insertLocationInventorySchema = createInsertSchema(locationInventory).omit({ id: true, updatedAt: true });
 export type InsertLocationInventory = z.infer<typeof insertLocationInventorySchema>;
 export type LocationInventory = typeof locationInventory.$inferSelect;
 
-// Equipment checkout schemas
 export const insertEquipmentCheckoutSchema = createInsertSchema(equipmentCheckouts).omit({ id: true, createdAt: true });
 export type InsertEquipmentCheckout = z.infer<typeof insertEquipmentCheckoutSchema>;
 export type EquipmentCheckout = typeof equipmentCheckouts.$inferSelect;
 
-// Asset scan history schemas
 export const insertAssetScanHistorySchema = createInsertSchema(assetScanHistory).omit({ id: true, scannedAt: true });
 export type InsertAssetScanHistory = z.infer<typeof insertAssetScanHistorySchema>;
 export type AssetScanHistory = typeof assetScanHistory.$inferSelect;
