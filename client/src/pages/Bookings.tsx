@@ -212,7 +212,7 @@ export default function Bookings() {
 
   const membershipBenefits = (Array.isArray(availableAssets) ? availableAssets : [])
     .map(mapAssetToBenefit)
-    .filter(Boolean)
+    .filter((benefit): benefit is NonNullable<typeof benefit> => !!benefit)
     .filter((benefit) => {
       if (!benefit) return false;
       const plan = (user as any)?.subscriptionPlan;
@@ -235,6 +235,109 @@ export default function Bookings() {
       }
       return false;
     });
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const generateQRCode = async (text: string) => {
+    try {
+      return await QRCodeGenerator.toDataURL(text);
+    } catch (err) {
+      console.error(err);
+      return '';
+    }
+  };
+
+  const formatTime = (time: string) => {
+    if (!time) return "";
+    const [h, m] = time.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  const handleSelectBenefit = (benefit: any) => {
+    if (benefit.remaining <= 0) return;
+    setSelectedBenefit(benefit);
+    setBookingStep('details');
+  };
+
+  const handleProceedToConfirm = () => {
+    setBookingStep('confirm');
+  };
+
+  const bookingMutation = useMutation({
+    mutationFn: async (bookingInfo: any) => {
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingInfo),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to create booking");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setShowBookingModal(false);
+      setBookingInProgress(false);
+      toast({
+        title: "Success",
+        description: "Your booking has been confirmed!",
+      });
+      setLocation("/bookings");
+    },
+    onError: (error: Error) => {
+      setBookingInProgress(false);
+      toast({
+        title: "Booking Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const cancelBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const res = await fetch(`/api/bookings/${bookingId}/cancel`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to cancel booking");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      setShowDetailsModal(false);
+      toast({
+        title: "Cancelled",
+        description: "Your booking has been cancelled.",
+      });
+    },
+  });
+
+  const handleConfirmBooking = () => {
+    if (!selectedBenefit) return;
+    setBookingInProgress(true);
+
+    const startTime = new Date(bookingDetails.date);
+    const [h, m] = bookingDetails.time.split(':').map(Number);
+    startTime.setHours(h, m, 0, 0);
+
+    const duration = parseFloat(bookingDetails.duration);
+    const endTime = new Date(startTime.getTime() + duration * 60 * 60 * 1000);
+
+    bookingMutation.mutate({
+      assetId: selectedBenefit.id,
+      startDate: startTime.toISOString(),
+      endDate: endTime.toISOString(),
+      location: bookingDetails.location,
+      benefitTitle: selectedBenefit.title,
+      benefitIcon: selectedBenefit.icon === '🌊' ? 'Waves' : selectedBenefit.icon === '⛺' ? 'Tent' : selectedBenefit.icon === '🚲' ? 'Bike' : 'Package'
+    });
+  };
 
   // Use real bookings from API
   const mockBookings: Booking[] = apiBookings

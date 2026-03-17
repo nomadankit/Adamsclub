@@ -72,18 +72,18 @@ async function normalizeBookingStatuses() {
       // Safety: If status is 'active' but end date is in the past, complete it.
       if (booking.status === BookingStatus.ACTIVE && bookingEndDate < now) {
         console.log(`[STARTUP] Auto-completing overdue booking: ${booking.id} (Scheduled End: ${booking.endDate})`);
-        db.transaction((tx) => {
-          tx.update(bookings).set({
+        await db.transaction(async (tx) => {
+          await tx.update(bookings).set({
             status: BookingStatus.COMPLETED,
             checkedInAt: bookingEndDate,
             updatedAt: now
-          }).where(eq(bookings.id, booking.id)).run();
+          }).where(eq(bookings.id, booking.id));
 
-          tx.update(assets).set({
+          await tx.update(assets).set({
             status: AssetStatus.AVAILABLE,
             isAvailable: true,
             updatedAt: now
-          }).where(eq(assets.id, booking.assetId)).run();
+          }).where(eq(assets.id, booking.assetId));
         });
         fixed++;
         continue;
@@ -110,7 +110,7 @@ async function normalizeBookingStatuses() {
       }
 
       if (!validStatuses.includes(booking.status as any)) {
-        let newStatus = BookingStatus.PENDING;
+        let newStatus: string = BookingStatus.PENDING;
         if (booking.checkedInAt) {
           newStatus = BookingStatus.COMPLETED;
         } else if (booking.checkedOutAt) {
@@ -485,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { code } = req.query;
       if (!code) return res.status(400).json({ message: "No scan code provided" });
 
-      const booking = await storage.getBookingByQRToken(code);
+      const booking = await storage.getBookingByQRCode(code as string);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found", barcode: code });
       }
@@ -571,20 +571,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2) If EXCELLENT, increment user.token_balance and insert transaction
       if (condition === 'EXCELLENT' && asset.excellentTokenReward && asset.excellentTokenReward > 0) {
-        const user = await db.select().from(users).where(eq(users.id, booking.userId)).get();
+        const [user] = await db.select().from(users).where(eq(users.id, booking.userId)).limit(1);
         if (user) {
-          const currentBalance = parseInt(user.metadata?.tokenBalance || '0');
+          const currentBalance = parseInt((user.metadata as any)?.tokenBalance || '0');
           const newBalance = currentBalance + asset.excellentTokenReward;
 
           await db.update(users).set({
             metadata: {
-              ...(user.metadata || {}),
+              ...((user.metadata as any) || {}),
               tokenBalance: newBalance.toString()
             }
           }).where(eq(users.id, booking.userId));
 
           await db.insert(tokenTransactions).values({
             userId: booking.userId,
+            id: crypto.randomUUID(), // Ensure UUID for Postgres
             bookingId: id,
             amount: asset.excellentTokenReward,
             type: 'EARNED'
@@ -1663,8 +1664,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Sum up quantity across all locations (or specific location if we filter by location later)
         let totalStock = inventoryItems.reduce((sum, item) => sum + item.quantity, 0);
 
-        // Fallback to asset quantity if locationInventory is not set up
-        if (totalStock === 0) totalStock = asset.quantity || 1;
+        // Fallback to 1 if locationInventory is not set up
+        if (totalStock === 0) totalStock = 1;
 
         if (totalStock === 0) continue; // Skip assets with no stock
 
@@ -1822,7 +1823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate,
         totalAmount: 0,
-        notes: notes || null
+        conditionNote: (req.body.notes as string) || null
       }, cost > 0 ? cost : undefined);
 
       console.log(`[BOOKING] Success - booking id: ${booking.id}, credits used: ${booking.creditsUsed}`);

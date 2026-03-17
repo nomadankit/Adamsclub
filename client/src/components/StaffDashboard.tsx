@@ -10,7 +10,7 @@ import { useState, useEffect } from "react"
 import { format } from "date-fns"
 
 export default function StaffDashboard() {
-  const { user, logoutMutation } = useAuth()
+  const { user, logout } = useAuth()
   const [, setLocation] = useLocation();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +33,7 @@ export default function StaffDashboard() {
   }, []);
 
   const handleLogout = async () => {
-    logoutMutation.mutate();
+    logout();
   }
 
   const handleQRScan = () => {

@@ -49,7 +49,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserRole(id: string, role: string): Promise<void>;
+  updateUserRole(id: string, role: string, changedBy?: string, reason?: string): Promise<void>;
   deleteUser(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   setPasswordHash(userId: string, passwordHash: string): Promise<void>;
@@ -372,10 +372,10 @@ export class DatabaseStorage implements IStorage {
     return booking;
   }
 
-  async getBookingByQRToken(qrToken: string): Promise<Booking | undefined> {
+  async getBookingByQRCode(qrToken: string): Promise<Booking | undefined> {
     const [booking] = await db.select().from(bookings).where(
       or(eq(bookings.qrToken, qrToken), eq(bookings.qrCode, qrToken))
-    );
+    ).limit(1);
     return booking || undefined;
   }
 
@@ -653,73 +653,6 @@ export class DatabaseStorage implements IStorage {
     return transaction as unknown as CreditTransaction;
   }
 
-  async createBookingWithCredits(
-    bookingData: Omit<InsertBooking, 'creditsUsed' | 'paidWithCredits'>,
-    creditAmount?: number
-  ): Promise<Booking> {
-    let actualCreditsUsed = 0;
-    let paidWithCredits = false;
-
-    if (creditAmount && creditAmount > 0) {
-      const [user] = await db.select().from(users).where(eq(users.id, bookingData.userId)).limit(1);
-      if (!user) throw new Error('User not found');
-
-      const currentBalance = parseFloat(user.adamsCredits || '0.00');
-      console.log(`[BOOKING_TX] Credit balance before: ${currentBalance}, cost: ${creditAmount}`);
-      if (currentBalance < creditAmount) {
-        throw new Error(`Insufficient Adams Credits. Available: ${currentBalance.toFixed(2)}, Required: ${creditAmount.toFixed(2)}`);
-      }
-
-      const newBalance = currentBalance - creditAmount;
-      await db
-        .update(users)
-        .set({ adamsCredits: newBalance.toFixed(2), updatedAt: new Date() })
-        .where(eq(users.id, bookingData.userId));
-
-      actualCreditsUsed = creditAmount;
-      paidWithCredits = creditAmount >= (bookingData.totalAmount || 0);
-      console.log(`[BOOKING_TX] Credits deducted: ${creditAmount}, new balance: ${newBalance}`);
-    }
-
-    const bookingId = crypto.randomUUID();
-    console.log(`[BOOKING_TX] Creating booking ${bookingId} for asset ${bookingData.assetId}`);
-
-    const qrToken = `ACB-${crypto.randomUUID()}`;
-    const endDate = new Date(bookingData.endDate as any);
-    const bufferEnd = new Date(endDate.getTime() + 60 * 60 * 1000);
-
-    const [booking] = await db
-      .insert(bookings)
-      .values({
-        ...bookingData,
-        id: bookingId,
-        creditsUsed: actualCreditsUsed.toFixed(2),
-        paidWithCredits,
-        qrToken,
-        qrCode: qrToken,
-        bufferEnd,
-      })
-      .returning();
-
-    if (actualCreditsUsed > 0) {
-      const [updatedUser] = await db.select().from(users).where(eq(users.id, bookingData.userId)).limit(1);
-      const balanceAfter = updatedUser?.adamsCredits || '0.00';
-      await db.insert(creditTransactions).values({
-        id: crypto.randomUUID(),
-        userId: bookingData.userId,
-        type: CreditTransactionType.SPEND,
-        amount: (-creditAmount!).toFixed(2),
-        balanceAfter,
-        description: `Payment for booking ${bookingId}`,
-        relatedEntityType: 'booking',
-        relatedEntityId: bookingId,
-        createdAt: new Date(),
-      });
-    }
-
-    console.log(`[BOOKING_TX] Booking ${bookingId} created successfully`);
-    return booking;
-  }
 
 
   async getCreditTransactions(userId: string, limit: number = 20): Promise<CreditTransaction[]> {
@@ -745,7 +678,7 @@ export class DatabaseStorage implements IStorage {
     bookingData: Omit<InsertBooking, 'creditsUsed' | 'paidWithCredits'>,
     creditAmount?: number
   ): Promise<Booking> {
-    return db.transaction((tx) => {
+    return await db.transaction(async (tx) => {
       let actualCreditsUsed = 0;
       let paidWithCredits = false;
 
@@ -754,7 +687,7 @@ export class DatabaseStorage implements IStorage {
           throw new Error('Credit amount must be a positive number');
         }
 
-        const [user] = tx.select().from(users).where(eq(users.id, bookingData.userId)).all();
+        const [user] = await tx.select().from(users).where(eq(users.id, bookingData.userId)).limit(1);
         if (!user) throw new Error('User not found');
 
         const currentBalance = parseFloat(user.adamsCredits || '0.00');
@@ -764,14 +697,13 @@ export class DatabaseStorage implements IStorage {
         }
 
         const newBalance = currentBalance - creditAmount;
-        tx
+        await tx
           .update(users)
           .set({
             adamsCredits: newBalance.toFixed(2),
             updatedAt: new Date()
           })
-          .where(eq(users.id, bookingData.userId))
-          .run();
+          .where(eq(users.id, bookingData.userId));
 
         actualCreditsUsed = creditAmount;
         paidWithCredits = creditAmount >= (bookingData.totalAmount || 0);
@@ -783,9 +715,10 @@ export class DatabaseStorage implements IStorage {
       console.log(`[BOOKING_TX] Creating booking ${bookingId} for asset ${bookingData.assetId}`);
 
       const qrToken = `ACB-${crypto.randomUUID()}`;
-      const endDate = new Date(bookingData.endDate);
+      const endDate = new Date(bookingData.endDate as any);
       const bufferEnd = new Date(endDate.getTime() + 60 * 60 * 1000);
-      tx
+      
+      const [booking] = await tx
         .insert(bookings)
         .values({
           ...bookingData,
@@ -796,14 +729,12 @@ export class DatabaseStorage implements IStorage {
           qrCode: qrToken,
           bufferEnd,
         })
-        .run();
-
-      const [booking] = tx.select().from(bookings).where(eq(bookings.id, bookingId)).all();
+        .returning();
 
       if (actualCreditsUsed > 0) {
-        const [updatedUser] = tx.select().from(users).where(eq(users.id, bookingData.userId)).all();
+        const [updatedUser] = await tx.select().from(users).where(eq(users.id, bookingData.userId)).limit(1);
         const balanceAfter = updatedUser?.adamsCredits || '0.00';
-        tx
+        await tx
           .insert(creditTransactions)
           .values({
             id: crypto.randomUUID(),
@@ -815,8 +746,7 @@ export class DatabaseStorage implements IStorage {
             relatedEntityType: 'booking',
             relatedEntityId: bookingId,
             createdAt: new Date()
-          })
-          .run();
+          });
       }
 
       console.log(`[BOOKING_TX] Transaction committed - booking ${bookingId} created`);

@@ -149,6 +149,8 @@ export default function AdminGear() {
       quantity: "0",
       isAvailable: true,
       maintenanceMode: false,
+      mainPrice: "",
+      excellentTokenReward: "",
     })
     setEditingId(null)
     setIsAddingNew(false)

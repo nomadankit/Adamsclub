@@ -4,7 +4,7 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { isAuthenticated } from "./auth";
 import { db } from "./db";
-import { memberships, users, tiers, creditTransactions } from "@shared/schema";
+import { memberships, users, tiers, creditTransactions, bookings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
   createIntent,
