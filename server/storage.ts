@@ -563,7 +563,6 @@ export class DatabaseStorage implements IStorage {
     stripePaymentIntentId?: string,
     processedBy?: string
   ): Promise<CreditTransaction> {
-    // Validate inputs
     if (amount <= 0 || !Number.isFinite(amount)) {
       throw new Error('Credit amount must be a positive number');
     }
@@ -574,53 +573,35 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Invalid transaction type: ${type}`);
     }
 
-    return db.transaction((tx) => {
-      // Get current balance
-      // Synchronous usage for better-sqlite3: .all() returns result array
-      const [user] = tx.select().from(users).where(eq(users.id, userId)).all();
-      if (!user) throw new Error('User not found');
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) throw new Error('User not found');
 
-      const currentBalance = parseFloat(user.adamsCredits || '0.00');
-      const newBalance = currentBalance + amount;
+    const currentBalance = parseFloat(user.adamsCredits || '0.00');
+    const newBalance = currentBalance + amount;
 
-      // Update user's credit balance
-      // Synchronous usage: .run() executes the statement
-      tx
-        .update(users)
-        .set({
-          adamsCredits: newBalance.toFixed(2),
-          updatedAt: new Date()
-        })
-        .where(eq(users.id, userId))
-        .run();
+    await db
+      .update(users)
+      .set({ adamsCredits: newBalance.toFixed(2), updatedAt: new Date() })
+      .where(eq(users.id, userId));
 
-      // Record transaction
-      const transactionId = crypto.randomUUID();
-      const transaction = {
-        id: transactionId,
-        userId,
-        // Ensure type key matches the enum value; user passes string key, we use enum value
-        type: CreditTransactionType[type],
-        amount: amount.toFixed(2),
-        balanceAfter: newBalance.toFixed(2),
-        description,
-        relatedEntityType: relatedEntityType || null,
-        relatedEntityId: relatedEntityId || null,
-        stripePaymentIntentId: stripePaymentIntentId || null,
-        processedBy: processedBy || null,
-        metadata: null,
-        createdAt: new Date()
-      };
+    const transactionId = crypto.randomUUID();
+    const transaction = {
+      id: transactionId,
+      userId,
+      type: CreditTransactionType[type],
+      amount: amount.toFixed(2),
+      balanceAfter: newBalance.toFixed(2),
+      description,
+      relatedEntityType: relatedEntityType || null,
+      relatedEntityId: relatedEntityId || null,
+      stripePaymentIntentId: stripePaymentIntentId || null,
+      processedBy: processedBy || null,
+      metadata: null,
+      createdAt: new Date(),
+    };
 
-      tx
-        .insert(creditTransactions)
-        .values({
-          ...transaction
-        })
-        .run();
-
-      return transaction;
-    });
+    await db.insert(creditTransactions).values(transaction);
+    return transaction as unknown as CreditTransaction;
   }
 
   async spendCredits(
@@ -630,7 +611,6 @@ export class DatabaseStorage implements IStorage {
     relatedEntityType?: string,
     relatedEntityId?: string
   ): Promise<CreditTransaction> {
-    // Validate inputs
     if (amount <= 0 || !Number.isFinite(amount)) {
       throw new Error('Credit amount must be a positive number');
     }
@@ -638,57 +618,109 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Credit amount exceeds maximum allowed');
     }
 
-    return db.transaction((tx) => {
-      // Get current balance
-      const [user] = tx.select().from(users).where(eq(users.id, userId)).all();
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) throw new Error('User not found');
+
+    const currentBalance = parseFloat(user.adamsCredits || '0.00');
+    if (currentBalance < amount) {
+      throw new Error(`Insufficient Adams Credits. Available: ${currentBalance.toFixed(2)}, Required: ${amount.toFixed(2)}`);
+    }
+
+    const newBalance = currentBalance - amount;
+
+    await db
+      .update(users)
+      .set({ adamsCredits: newBalance.toFixed(2), updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    const transactionId = crypto.randomUUID();
+    const transaction = {
+      id: transactionId,
+      userId,
+      type: CreditTransactionType.SPEND,
+      amount: (-amount).toFixed(2),
+      balanceAfter: newBalance.toFixed(2),
+      description,
+      relatedEntityType: relatedEntityType || null,
+      relatedEntityId: relatedEntityId || null,
+      stripePaymentIntentId: null,
+      processedBy: null,
+      metadata: null,
+      createdAt: new Date(),
+    };
+
+    await db.insert(creditTransactions).values(transaction);
+    return transaction as unknown as CreditTransaction;
+  }
+
+  async createBookingWithCredits(
+    bookingData: Omit<InsertBooking, 'creditsUsed' | 'paidWithCredits'>,
+    creditAmount?: number
+  ): Promise<Booking> {
+    let actualCreditsUsed = 0;
+    let paidWithCredits = false;
+
+    if (creditAmount && creditAmount > 0) {
+      const [user] = await db.select().from(users).where(eq(users.id, bookingData.userId)).limit(1);
       if (!user) throw new Error('User not found');
 
       const currentBalance = parseFloat(user.adamsCredits || '0.00');
-
-      if (currentBalance < amount) {
-        throw new Error(`Insufficient Adams Credits. Available: ${currentBalance.toFixed(2)}, Required: ${amount.toFixed(2)}`);
+      console.log(`[BOOKING_TX] Credit balance before: ${currentBalance}, cost: ${creditAmount}`);
+      if (currentBalance < creditAmount) {
+        throw new Error(`Insufficient Adams Credits. Available: ${currentBalance.toFixed(2)}, Required: ${creditAmount.toFixed(2)}`);
       }
 
-      const newBalance = currentBalance - amount;
-
-      // Update user's credit balance
-      tx
+      const newBalance = currentBalance - creditAmount;
+      await db
         .update(users)
-        .set({
-          adamsCredits: newBalance.toFixed(2),
-          updatedAt: new Date()
-        })
-        .where(eq(users.id, userId))
-        .run();
+        .set({ adamsCredits: newBalance.toFixed(2), updatedAt: new Date() })
+        .where(eq(users.id, bookingData.userId));
 
-      // Record transaction (negative amount for spending)
-      const transactionId = crypto.randomUUID();
-      const transaction = {
-        id: transactionId,
-        userId,
+      actualCreditsUsed = creditAmount;
+      paidWithCredits = creditAmount >= (bookingData.totalAmount || 0);
+      console.log(`[BOOKING_TX] Credits deducted: ${creditAmount}, new balance: ${newBalance}`);
+    }
+
+    const bookingId = crypto.randomUUID();
+    console.log(`[BOOKING_TX] Creating booking ${bookingId} for asset ${bookingData.assetId}`);
+
+    const qrToken = `ACB-${crypto.randomUUID()}`;
+    const endDate = new Date(bookingData.endDate as any);
+    const bufferEnd = new Date(endDate.getTime() + 60 * 60 * 1000);
+
+    const [booking] = await db
+      .insert(bookings)
+      .values({
+        ...bookingData,
+        id: bookingId,
+        creditsUsed: actualCreditsUsed.toFixed(2),
+        paidWithCredits,
+        qrToken,
+        qrCode: qrToken,
+        bufferEnd,
+      })
+      .returning();
+
+    if (actualCreditsUsed > 0) {
+      const [updatedUser] = await db.select().from(users).where(eq(users.id, bookingData.userId)).limit(1);
+      const balanceAfter = updatedUser?.adamsCredits || '0.00';
+      await db.insert(creditTransactions).values({
+        id: crypto.randomUUID(),
+        userId: bookingData.userId,
         type: CreditTransactionType.SPEND,
-        amount: (-amount).toFixed(2),
-        balanceAfter: newBalance.toFixed(2),
-        description,
-        relatedEntityType: relatedEntityType || null,
-        relatedEntityId: relatedEntityId || null,
-        stripePaymentIntentId: null,
-        processedBy: null,
-        metadata: null,
-        createdAt: new Date()
-      };
+        amount: (-creditAmount!).toFixed(2),
+        balanceAfter,
+        description: `Payment for booking ${bookingId}`,
+        relatedEntityType: 'booking',
+        relatedEntityId: bookingId,
+        createdAt: new Date(),
+      });
+    }
 
-      tx
-        .insert(creditTransactions)
-        .values({
-          ...transaction,
-          // ensure fields match schema (createdAt defaults to now if omitted, but we set it)
-        })
-        .run();
-
-      return transaction;
-    });
+    console.log(`[BOOKING_TX] Booking ${bookingId} created successfully`);
+    return booking;
   }
+
 
   async getCreditTransactions(userId: string, limit: number = 20): Promise<CreditTransaction[]> {
     return await db
