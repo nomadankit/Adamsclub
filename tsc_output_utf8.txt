@@ -1,0 +1,33 @@
+﻿client/src/components/StaffDashboard.tsx(13,17): error TS2339: Property 'logoutMutation' does not exist on type '{ user: { id: string; email: string | null; password: string | null; firstName: string | null; lastName: string | null; profileImageUrl: string | null; googleId: string | null; role: string | null; ... 11 more ...; updatedAt: Date | null; } | undefined; ... 5 more ...; capabilitiesError: Error | null; }'.
+client/src/pages/AdminGear.tsx(139,17): error TS2345: Argument of type '{ name: string; description: string; category: string; brand: string; model: string; condition: string; type: string; dailyRate: string; depositAmount: string; quantity: string; isAvailable: true; maintenanceMode: false; }' is not assignable to parameter of type 'SetStateAction<{ name: string; description: string; category: string; brand: string; model: string; condition: string; type: string; dailyRate: string; depositAmount: string; quantity: string; isAvailable: boolean; maintenanceMode: boolean; mainPrice: string; excellentTokenReward: string; }>'.
+  Type '{ name: string; description: string; category: string; brand: string; model: string; condition: string; type: string; dailyRate: string; depositAmount: string; quantity: string; isAvailable: true; maintenanceMode: false; }' is missing the following properties from type '{ name: string; description: string; category: string; brand: string; model: string; condition: string; type: string; dailyRate: string; depositAmount: string; quantity: string; isAvailable: boolean; maintenanceMode: boolean; mainPrice: string; excellentTokenReward: string; }': mainPrice, excellentTokenReward
+client/src/pages/Bookings.tsx(246,27): error TS2304: Cannot find name 'generateQRCode'.
+client/src/pages/Bookings.tsx(596,26): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(597,94): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(600,27): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(601,36): error TS2304: Cannot find name 'handleSelectBenefit'.
+client/src/pages/Bookings.tsx(606,54): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(609,38): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(610,32): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(616,75): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(619,26): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(627,34): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(631,30): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(633,61): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(634,30): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(634,53): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(639,24): error TS18047: 'benefit' is possibly 'null'.
+client/src/pages/Bookings.tsx(733,30): error TS2552: Cannot find name 'formatTime'. Did you mean 'formatDate'?
+client/src/pages/Bookings.tsx(792,30): error TS2304: Cannot find name 'handleProceedToConfirm'.
+client/src/pages/Bookings.tsx(840,30): error TS2552: Cannot find name 'handleConfirmBooking'. Did you mean 'handleNewBooking'?
+client/src/pages/Bookings.tsx(967,25): error TS2304: Cannot find name 'cancelBookingMutation'.
+client/src/pages/Bookings.tsx(970,31): error TS2304: Cannot find name 'cancelBookingMutation'.
+client/src/pages/Bookings.tsx(972,22): error TS2304: Cannot find name 'cancelBookingMutation'.
+client/src/pages/StaffDashboard.tsx(62,42): error TS2339: Property 'activeCheckouts' does not exist on type 'StaffDashboardData'.
+client/src/pages/StaffDashboard.tsx(63,42): error TS2339: Property 'pendingReturns' does not exist on type 'StaffDashboardData'.
+server/routes.ts(115,11): error TS2322: Type '"completed"' is not assignable to type '"pending"'.
+server/routes.ts(117,11): error TS2322: Type '"active"' is not assignable to type '"pending"'.
+server/routes.ts(1668,50): error TS2339: Property 'quantity' does not exist on type '{ id: string; name: string; description: string | null; type: string; category: string | null; brand: string | null; model: string | null; barcode: string | null; serialNumber: string | null; ... 17 more ...; updatedAt: Date | null; }'.
+server/routes.ts(1826,9): error TS2353: Object literal may only specify known properties, and 'notes' does not exist in type 'Omit<{ userId: string; assetId: string; startDate: Date; endDate: Date; status?: string | null | undefined; depositAmount?: number | null | undefined; totalAmount?: number | null | undefined; ... 17 more ...; bufferEnd?: Date | ... 1 more ... | undefined; }, "creditsUsed" | "paidWithCredits">'.
+server/stripeRoutes.ts(921,25): error TS2304: Cannot find name 'bookings'.
+server/stripeRoutes.ts(923,21): error TS2304: Cannot find name 'bookings'.

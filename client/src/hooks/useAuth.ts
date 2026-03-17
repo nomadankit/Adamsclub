@@ -60,6 +60,7 @@ export function useAuth() {
                 user: session.user,
                 provider: session.user.user_metadata?.provider || 'email'
               }),
+              credentials: 'include'
             });
           } catch (e) {
             console.error('Session sync error:', e);

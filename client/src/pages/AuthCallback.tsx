@@ -52,8 +52,15 @@ export default function AuthCallback() {
         // Invalidate the user query cache to force a refresh
         await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
         
-        // Successful login - redirect to home
-        window.location.href = '/home';
+        // Successful login - redirect based on role
+        const userRole = data.user?.role || 'member';
+        if (userRole === 'admin') {
+          window.location.href = '/admin/home';
+        } else if (userRole === 'staff') {
+          window.location.href = '/staff/home';
+        } else {
+          window.location.href = '/home';
+        }
       } catch (err) {
         console.error('Callback error:', err);
         setLocation('/login');
